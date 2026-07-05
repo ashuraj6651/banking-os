@@ -41,8 +41,8 @@ const MISSION_ICON: Record<string, typeof BookOpen> = {
 
 export function MissionControl() {
   const { startSession, setView } = useBankOS();
-  const { data: stats } = useProfileStats();
-  const { data: missionsData, isLoading: missionsLoading } = useMissions();
+  const { data: stats, isLoading: statsLoading, isError: statsError, error: statsErrorObj, refetch: refetchStats } = useProfileStats();
+  const { data: missionsData, isLoading: missionsLoading, isError: missionsError, error: missionsErrorObj, refetch: refetchMissions } = useMissions();
   const toggleMission = useToggleMission();
   const { data: analytics } = useAnalytics();
 
@@ -55,11 +55,57 @@ export function MissionControl() {
   const s = stats?.stats;
   const mastery = analytics?.mastery ?? [];
 
-  if (!profile) {
+  if (statsError) {
+    console.warn("useProfileStats error:", statsErrorObj);
+    return (
+      <div className="grid min-h-[50vh] place-items-center">
+        <div className="text-center text-white/60">
+          <div className="mb-3">Failed to load your profile. Please retry.</div>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                refetchStats();
+                refetchMissions();
+              }}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => setView("onboarding")}
+              className="rounded-2xl border border-transparent bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95"
+            >
+              Open Onboarding
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // show initial loading if profile data or missions are still being fetched
+  if (!profile && (statsLoading || missionsLoading)) {
     return (
       <div className="grid min-h-[50vh] place-items-center">
         <div className="flex items-center gap-3 text-white/50">
           <Sparkles className="h-5 w-5 animate-pulse" /> Loading your mission…
+        </div>
+      </div>
+    );
+  }
+
+  // no profile (but not loading) — prompt onboarding
+  if (!profile) {
+    return (
+      <div className="grid min-h-[50vh] place-items-center">
+        <div className="text-center text-white/60">
+          <div className="mb-3">No profile found. Complete onboarding to get started.</div>
+          <button
+            onClick={() => setView("onboarding")}
+            className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95"
+          >
+            Start Onboarding
+          </button>
         </div>
       </div>
     );
