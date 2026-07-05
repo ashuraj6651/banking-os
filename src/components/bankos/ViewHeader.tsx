@@ -29,13 +29,13 @@ export function ViewHeader({
       <div>
         {badge && (
           <div className="mb-3">
-            <GlowBadge color="violet">
+            <GlowBadge color="violet" animated>
               {badgeIcon}
               {badge}
             </GlowBadge>
           </div>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{title}</h1>
+        <h1 className="gradient-underline text-2xl font-bold tracking-tight text-white sm:text-3xl">{title}</h1>
         {subtitle && <p className="mt-1.5 max-w-2xl text-sm text-white/50">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}

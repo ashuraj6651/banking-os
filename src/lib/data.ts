@@ -6,6 +6,7 @@
 
 export type AppView =
   | "mission"
+  | "challenge"
   | "coach"
   | "practice"
   | "mock"
@@ -16,6 +17,7 @@ export type AppView =
   | "revision"
   | "current"
   | "syllabus"
+  | "timer"
   | "profile"
   | "settings";
 

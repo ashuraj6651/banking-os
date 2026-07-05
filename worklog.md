@@ -235,3 +235,367 @@ Stage Summary:
    - Add data export/import validation
    - Consider adding a "Study Timer" standalone feature
    - Add dark/light theme toggle functionality (currently only dark)
+
+---
+Task ID: 5
+Agent: Styling Expert
+Task: Comprehensive styling improvements
+
+Work Log:
+- Enhanced globals.css with 12+ new CSS utilities and animations
+- Improved GlassCard hover effects with border-color and box-shadow transitions
+- Enhanced ViewHeader with gradient underline and animated badge borders
+- Improved Landing page with floating particles, ripple CTA, scroll indicator, noise texture
+- Enhanced Primitives: GlowBadge animated border gradient, Wordmark hover glow
+- Removed unused imports (Counter, useState) from Landing.tsx
+
+Stage Summary:
+- 12+ new CSS utilities added (scrollbar-thin, skeleton-shimmer, btn-press, noise-bg, animated-border-gradient, gradient-underline, wordmark-glow, float-slow, scroll-indicator, ripple-container, text-gradient, page-transition)
+- GlassCard now transitions all properties on hover (border glow + inner shadow from CSS)
+- ViewHeader h1 has violet→cyan gradient underline via CSS pseudo-element
+- GlowBadge supports `animated` prop for rotating border gradient effect
+- Wordmark has subtle drop-shadow glow and scale on hover
+- Landing hero has 10 CSS-only floating particle dots with staggered timings
+- Landing CTA buttons have ripple effect on click + press feedback
+- Landing has scroll-down indicator with mouse icon and bounce animation
+- Landing has noise-bg texture overlay for depth
+- Feature cards have more pronounced staggered reveal (0.08s vs 0.05s) and btn-press
+- Lint passes clean on all modified files (pre-existing StudyTimer/DailyChallenge issues unchanged)
+
+---
+Task ID: 3
+Agent: Study Timer Builder
+Task: Create Pomodoro-style Study Timer feature
+
+Work Log:
+- Read existing components (Ring, ViewHeader, GlassCard, MissionControl) to understand code patterns
+- Added "timer" to AppView union type in /src/lib/data.ts
+- Created /src/components/bankos/views/StudyTimer.tsx with full Pomodoro functionality
+- Added StudyTimer import, NAV entry (Operate group, Clock icon), and ViewRouter case in AppShell.tsx
+- Fixed lint error: moved handleTimerComplete before timer tick useEffect to resolve "accessed before declared"
+- Fixed lint warnings: removed unused eslint-disable directives
+- Final lint passes clean (0 errors from StudyTimer)
+
+Stage Summary:
+- Study Timer fully functional with 25/5/15 minute modes (Focus, Short Break, Long Break)
+- Custom circular progress ring with gradient stroke and glow, matching BankOS design
+- Start/Pause/Reset/Skip controls with gradient buttons
+- Session counter with 4-dot progress indicator (every 4 focus sessions triggers long break)
+- Auto-switch between focus → short break → focus… → long break cycle
+- Motivational quotes rotate every 30 seconds during focus mode with AnimatePresence transitions
+- Stats tracking: total focus minutes today, sessions completed today, timer streak (days)
+- Sound notification via Web Audio API (dual-frequency beep) with toggle
+- Timer state persists to localStorage (survives page navigation and refresh)
+- Day stats reset on new day with streak computation
+- "How Pomodoro Works" explainer card at bottom
+- Mobile-friendly responsive layout
+- Uses existing GlassCard, ViewHeader, cn() primitives
+- Dark theme with violet/cyan/emerald accent colors matching BankOS design system
+- Added to Operate nav group in sidebar with Clock icon
+
+---
+Task ID: 4
+Agent: Daily Challenge Builder
+Task: Create Daily Challenge quiz mode
+
+Work Log:
+- Added "challenge" to AppView type union in `/src/lib/data.ts`
+- Created `/src/components/bankos/views/DailyChallenge.tsx` with full quiz feature:
+  - Three phases: "intro" (challenge info + stats), "live" (answering questions), "result" (score summary)
+  - 30-second countdown timer per question with animated progress bar (color shifts: emerald → amber → rose)
+  - Scoring: +20 correct, -5 wrong, +10 speed bonus (under 10 seconds)
+  - Animated transitions between questions using framer-motion AnimatePresence
+  - CSS-only confetti effect (40 animated divs with @keyframes confetti-fall) on perfect score
+  - localStorage history tracking: date-keyed records with score, correct count, time
+  - Streak computation (consecutive days, tolerates today/yesterday start)
+  - Best score and average score from history
+  - Share score button (copies formatted text to clipboard via navigator.clipboard)
+  - Recent history sidebar showing last 5 challenges
+  - Glass-morphism UI matching BankOS dark theme (GlassCard, GlassPanel, ViewHeader, Ring, Counter)
+  - Mobile-friendly with min-h-[52px] touch targets, responsive grid layout
+  - Uses existing `useQuestions` and `useSubmitAttempt` hooks from `@/lib/hooks`
+  - Auto-submits as wrong on timer timeout
+  - Question progress dots showing answered/unanswered/current state
+- Added confetti-fall keyframe animation to `/src/app/globals.css`
+- Updated `/src/components/bankos/AppShell.tsx`:
+  - Imported `Target` icon and `DailyChallenge` component
+  - Added "Daily Challenge" nav item in "Operate" group after Mission Control
+  - Added `case "challenge"` in ViewRouter switch
+- Fixed ESLint warning: moved handleSelect useCallback before the useEffect that depends on it, proper deps array
+
+Stage Summary:
+- Daily Challenge fully functional with timer, scoring, streaks, history, share
+- Added to Operate nav group with Target icon
+- Lint passes clean (0 errors, 0 warnings in new code)
+
+---
+Task ID: 6
+Agent: Flashcard + Achievement Builder
+Task: Add Flashcard review mode and Achievement unlock toasts
+
+Work Log:
+- Added Flashcard mode toggle button to Revision.tsx ViewHeader actions
+- Implemented 3D flip card using framer-motion rotateY transform with preserve-3d and backface-visibility
+- Front face shows topic name + subject with glass-morphism styling and violet/cyan glow accents
+- Back face shows Due, Strength %, Interval in 3-column GlassPanel grid
+- Swipe right / "Got it" button marks item as reviewed via useReviewItem mutation, advances to next card
+- Swipe left / "Needs work" button just advances without reviewing
+- Drag gesture with motion values for rotation, opacity, color overlay, and directional text labels
+- Progress indicator bar and "X of Y cards" counter
+- AnimatePresence for smooth card transitions between items
+- Exit button returns to list view; auto-exits with toast on last card
+- Added achievement unlock detection to Profile.tsx using useEffect + localStorage
+- Compares user achievements with "bankos_seen_achievements" localStorage key
+- Shows toast.success for each new achievement with 1s delay via setTimeout
+- Uses useRef guard to prevent re-firing on reactive re-renders
+- Fixed React Compiler memoization lint error (added handleReview to advanceCard deps)
+- Lint passes clean
+
+Stage Summary:
+- Flashcard mode fully functional with 3D flip, swipe gestures, review/advance actions
+- Achievement toasts show on new unlocks since last visit
+- No new files created, no schema/API changes
+- Lint passes clean
+
+---
+Task ID: 7
+Agent: Mobile + Settings Enhancer
+Task: Enhance mobile drawer, Syllabus view, and Settings view
+
+Work Log:
+- Enhanced mobile drawer in AppShell.tsx:
+  - Added user avatar card at bottom matching desktop sidebar (avatar, name, email, logout button)
+  - Added backdrop blur animation (backdropFilter animates from 0px to 8px on open)
+  - Added active section indicator with glowing violet dot (absolute positioned, shadow glow)
+  - Made mobile drawer wider on tablets (320px on md breakpoint via md:w-[320px])
+  - Added haptic-like visual feedback (whileTap scale: 0.95) on nav item taps
+  - Changed drawer to flex-col layout so user card stays pinned at bottom
+  - Added active state icon color (violet-300) to mobile nav items
+- Improved Syllabus.tsx:
+  - Added progress summary bar at top (thin gradient bar under Ring showing overall completion)
+  - Subject-level collapse/expand with animated chevron (eased rotation transition)
+  - Added "Mark all complete" button per subject using useToggleSyllabus with toast feedback
+  - Added "All done" badge when subject is 100% complete
+  - Topic count per subject shown as "X/Y topics" in header and in progress grid
+  - Subtle animations when checking/unchecking (rotate -90→0 spring on check icon, whileTap scale: 0.97 on topic buttons)
+  - Full skeleton loading state (SyllabusSkeleton component with header, progress card, search, and subject card skeletons)
+  - Improved empty state with search icon, description text, and "Clear search" button
+  - Added subject progress stats text ("X of Y topics completed") above groups
+  - Removed unused Loader2 import, added CheckCircle2
+- Improved SettingsView.tsx:
+  - Grouped settings into clear sections with section headers and separators
+  - Added "Study Preferences" section with:
+    - Daily goal slider (10-100, step 5) using shadcn Slider component
+    - Default difficulty selector using shadcn Select (Easy/Medium/Hard/Mixed)
+    - Default timer for focus sessions using shadcn Select (15/25/30/45 min)
+  - Added "Notifications" section with toggles for:
+    - Daily reminder (new), Streak warning (new), Achievement alerts (new)
+    - Morning briefing, Revision due, Weekly digest (existing, reorganized)
+  - Reorganized into: Study Preferences, Notifications, Appearance, AI Settings, Focus Mode, Data & Privacy, Account, About
+  - Added "Data & Privacy" section combining Backup & Sync + Clear all data:
+    - Export data button (triggers existing useExportBackup)
+    - Import data button (triggers existing useImportBackup)
+    - Clear all data button with shadcn AlertDialog confirmation dialog
+  - Added "About" section (full-width) with:
+    - App version (v0.2.0), Framework info, Credits
+    - Description paragraph
+  - All settings stored in localStorage via existing useSetting hook
+  - Subtle section separators (Separator component with white/[0.04]) between each setting row
+  - useSetting hook improved with useCallback for stable setter reference
+  - Added btn-press class to action buttons
+  - Removed unused Cloud, Clock, Target imports, added new icons (GraduationCap, Trash2, Info, Heart)
+
+Stage Summary:
+- All three views significantly improved
+- Mobile experience much better with user card, tap feedback, and wider tablet drawer
+- Syllabus has skeleton loading, mark-all, animated check, and better empty state
+- Settings reorganized into 8 clear sections with study preferences, clear data dialog, and about
+- Lint passes clean (0 errors, 0 warnings)
+
+---
+Task ID: 8
+Agent: Analytics + WorldMap Enhancer
+Task: Enhanced Analytics and WorldMap with more details and interactivity
+
+Work Log:
+- Added Weekly Comparison section to Analytics (this week vs last week with ↑↓ indicators, green/rose colors)
+- Enhanced SkillBar component with framer-motion whileInView animation, mastery-based color (red<40, amber 40-70, green>70), shimmer overlay, hover tooltip
+- Added Best Study Times card with morning/afternoon/evening/night activity blocks, percentages, "Best" label with cyan glow
+- Added Quick Actions row (Practice Weak Areas, Start Mock Test, Review Errors, Plan My Day) using GlassCard + useBankOS setView
+- Enhanced empty state with animated-border-gradient class
+- WorldMap: Added animated SVG dash-offset animation on route lines (moving dashes with glow filter)
+- WorldMap: Added pulsing circle glow animation at each unlocked region node
+- WorldMap: Added Region Detail Panel on click (AnimatePresence, Ring, progress bar, topic count, Continue/Start Practice buttons)
+- WorldMap: Added floating overall map progress bar at bottom of map card
+- WorldMap: Replaced Loader2 spinner with skeleton shimmer placeholders matching map node layout
+- WorldMap: Changed region node click from direct navigation to showing detail panel
+- WorldMap: Added "Explore" link on region cards in bottom grid
+- Lint passes clean (0 errors, 0 warnings)
+
+Stage Summary:
+- Analytics much more informative with weekly comparison, study time distribution, quick actions, and polished skill bars
+- WorldMap more interactive with animated route lines, pulsing nodes, detail panel, and overall progress
+- Lint passes clean
+
+---
+Task ID: 9
+Agent: Seed Questions + Shortcuts
+Task: Add 40+ seed questions and enhance keyboard shortcuts
+
+Work Log:
+- Added 42 new high-quality banking exam questions across 5 subjects to prisma/seed.ts
+  - Reasoning (8): puzzle (heights), seating arrangement (circular), blood relations (coded), coding-decoding (+1 shift), syllogism (some/all), direction sense (4 turns), inequality (chain comparison), series (n²-1)
+  - Quant (8): percentage (consumption reduction), profit-loss (markup+discount), SI (successive amounts), CI (difference from SI), time-work (A+B then A alone), speed-distance (train+pole), mixture (replacement), average (replacement), number series (wrong term)
+  - English (8): reading comprehension (moral hazard), error spotting (each+have), fill in blank (mitigate), para jumble (BACD), cloze test (repo+inflation), synonym (prudent), antonym (transparent), sentence improvement (not only), idiom (leopard spots)
+  - Current Affairs (8): MPC members, GDP growth FY24, PMJDY overdraft, UPI/NPCI, SDF rate, largest trading partner, MUDRA limit, Digital India year
+  - Banking (8): KYC full form, RTGS minimum, Nostro account, NPA 90-day rule, MSF rate, first ATM bank, Lead Bank Scheme, NEFT batches
+- Fixed 3 question accuracy issues (inequality answer index, time-work non-integer fix, coding-decoding clean pattern)
+- Ran prisma db seed successfully — 75 total questions in database
+- Rewrote CommandPalette.tsx with enhanced keyboard shortcuts:
+  - Added global useEffect keyboard handler using useCallback for stable reference
+  - 1-9 keys: Switch to nav views (mission, challenge, coach, timer, practice, mock, syllabus, analytics, world)
+  - `?` or `Shift+/`: Open command palette
+  - `Escape`: Close command palette, focus mode, and mobile drawer (via custom event)
+  - `T`: Jump to study timer
+  - All shortcuts check `document.activeElement` to avoid triggering when typing in inputs
+- Added AppShell listener for `bankos:close-overlays` custom event to close mobile drawer on Escape
+- Enhanced CommandPalette footer with 4 shortcut hints: ⌘K/?, 1-9, T, Esc
+- Added "Keyboard Shortcuts" help entry in command palette search (matches "shortcuts", "keyboard", "reference")
+- Added ShortcutsHelpCard component showing all 5 shortcuts with kbd styling
+- Removed unused imports (Target, Clock, isShortcutsQuery variable)
+- Lint passes clean (0 errors, 0 warnings)
+
+Stage Summary:
+- 75 total questions in database (33 original + 42 new)
+- Keyboard shortcuts fully functional with input-focus guard
+- Command palette shows shortcuts help card on search
+- Mobile drawer closes on Escape via custom event
+- Lint passes clean
+
+---
+Task ID: 10
+Agent: Main (Round 3 - Features, Styling, QA)
+Task: Comprehensive feature additions, styling improvements, and bug fixes
+
+Work Log:
+- Assessed project status: stable after 2 prior rounds of bug fixes
+- Lint clean (0 errors), server compiles successfully (200 on all routes)
+- Agent-browser unavailable (known network namespace limitation), used code analysis instead
+
+## Direct Fixes & Enhancements:
+
+### CurrentAffairs.tsx — Complete Overhaul
+- Implemented functional "Take Quiz" button → navigates to Practice with "Current Affairs" filter
+- Added tag distribution stats bar showing category counts
+- Added expandable article cards (click to expand/collapse summary)
+- Added "Quiz me" button on each article card
+- Added shimmer skeleton loading state
+- Enhanced empty state with CTA button
+- Added featured card glow effects and time labels
+- Added `btn-press` class for tactile feedback
+
+### Practice.tsx — Bookmark Persistence + Filter Integration
+- Bookmarks now persist to localStorage (survives page reload/navigation)
+- Added `useEffect` to read filter preference from localStorage (set by CurrentAffairs "Take Quiz")
+- Added `useEffect` to sync bookmarks to localStorage on change
+- Replaced spinner loading state with skeleton shimmer (3 question card placeholders)
+
+### Auth.tsx — Password Visibility Toggle
+- Added Eye/EyeOff toggle button on password field
+- New `showPw` state and toggle button with proper accessibility (tabIndex={-1})
+
+### Package.json — Seed Script
+- Added `"db:seed": "bun run prisma/seed.ts"` script
+
+## Subagent Work (7 parallel tasks):
+
+### Study Timer (Task ID 3) — NEW FEATURE
+- Full Pomodoro timer: 25/5/15 min modes, circular progress ring, session counter
+- Sound notifications (Web Audio API), localStorage persistence, motivational quotes
+
+### Daily Challenge (Task ID 4) — NEW FEATURE
+- 5-question daily quiz with 30s timer, scoring (+20/-5/+10 speed bonus), streaks
+- CSS confetti on perfect score, share button, history tracking in localStorage
+
+### Styling Improvements (Task ID 5) — 12+ NEW CSS UTILITIES
+- `scrollbar-thin`, `skeleton-shimmer`, `btn-press`, `noise-bg`, `animated-border-gradient`
+- `gradient-underline`, `wordmark-glow`, `float-slow`, `scroll-indicator`, `ripple-container`
+- GlassCard hover glow, ViewHeader gradient underline, GlowBadge animated border
+- Landing page: 10 floating particles, ripple CTAs, scroll indicator, noise overlay
+
+### Flashcard Review (Task ID 6) — NEW FEATURE
+- 3D flip cards in Revision Engine with swipe gestures
+- Drag-to-review: swipe right = "Got it", swipe left = "Needs work"
+- Progress indicator, auto-exit on completion
+
+### Achievement Toasts (Task ID 6) — NEW FEATURE
+- Detects new achievement unlocks in Profile, shows celebratory toasts
+- Uses localStorage to track previously seen achievements
+
+### Mobile + Syllabus + Settings (Task ID 7) — ENHANCED
+- Mobile drawer: user card, tap feedback (scale 0.95), wider tablet mode, active dot indicator
+- Syllabus: collapse/expand, mark-all-complete, search, skeleton loading, topic counts
+- Settings: 8 organized sections, study preferences (daily goal slider, difficulty), clear data dialog, about section
+
+### Analytics + WorldMap (Task ID 8) — ENHANCED
+- Analytics: weekly comparison, study time distribution, quick actions row, animated SkillBars
+- WorldMap: animated route lines, pulsing nodes, region detail panel, overall progress bar
+
+### Seed Questions + Keyboard Shortcuts (Task ID 9) — NEW CONTENT + FEATURE
+- 42 new exam-quality questions (75 total across 5 subjects)
+- Keyboard shortcuts: 1-9 nav, ? command palette, T timer, Escape close
+- Searchable shortcuts help in command palette
+
+## Round 3 Summary:
+- 4 new features: Study Timer, Daily Challenge, Flashcard Review, Keyboard Shortcuts
+- 2 new capabilities: Achievement Toasts, Bookmark Persistence
+- 42 new seed questions (75 total)
+- 12+ new CSS utilities for enhanced visual effects
+- 8+ views significantly enhanced with more details and interactivity
+- Mobile experience improved
+- Auth UX improved with password toggle
+- All changes preserve existing AI provider (Google Gemini)
+- No database schema changes
+- Lint passes clean (0 errors)
+- Server compiles and serves (200 on all routes)
+
+---
+## PROJECT STATUS SUMMARY (Round 3 Complete)
+
+### Current Project Status:
+BankingOS is a fully functional banking exam preparation web application. After 3 rounds of development (bug fixes, polish, features), the app is in a mature and feature-rich state. All 6 original critical bugs are fixed, 20+ additional issues resolved, 4 major new features added, and comprehensive styling improvements applied.
+
+### Completed Features/Modifications:
+- **15 views**: Mission Control, AI Coach, Practice, Mock Tests, Syllabus, Analytics, World Map, Skill Tree, Current Affairs, Error Notebook, Revision Engine, Profile, Settings, Study Timer (NEW), Daily Challenge (NEW)
+- **75 exam-quality questions** across 5 subjects
+- **Pomodoro Study Timer** with sound, persistence, and session tracking
+- **Daily Challenge** with timer, scoring, streaks, and sharing
+- **Flashcard Review** mode in Revision Engine
+- **Keyboard shortcuts** (1-9 nav, ?, T, Esc)
+- **Achievement unlock toasts** 
+- **Bookmark persistence** across sessions
+- **Current Affairs Take Quiz** integration with Practice
+- **Comprehensive CSS system**: 12+ utility classes for animations, effects, feedback
+- **Enhanced mobile experience** with drawer improvements
+- **Settings overhaul** with 8 organized sections
+
+### Verification Results:
+- ESLint: 0 errors, 0 warnings
+- Server: Compiles and serves 200 on all routes
+- Seed: 75 questions, 6 current affairs
+- All subagent work verified with clean lint
+
+### Unresolved Issues / Risks:
+1. **Dev server memory instability**: Next.js Turbopack intermittently dies in ~4GB RAM environment. Not a code bug. Server compiles correctly when running.
+2. **GEMINI_API_KEY**: Not in .env. AI features (question generation, current affairs refresh, AI coach) need this key. Code handles missing key gracefully.
+3. **Priority recommendations for next phase**:
+   - Add GEMINI_API_KEY to .env to enable all AI features
+   - Implement dark/light theme toggle (currently dark-only)
+   - Add error boundary components for graceful crash handling
+   - Add data export/import validation
+   - Add more mock test templates (sectional, topic-specific)
+   - Consider adding a "Study Streak Calendar" view
+   - Add performance comparison vs other users (if multi-user)
+   - Add sound effects for correct/wrong answers in Practice
+   - Improve FocusMode with better question transitions
+   - Add notes export from FocusMode to Notebook

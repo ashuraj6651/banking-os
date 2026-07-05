@@ -32,7 +32,7 @@ export function GlassCard({
       className={cn(
         "glass-card rounded-3xl",
         glow && "glow-border",
-        hover && "transition-transform duration-500 hover:-translate-y-1",
+        hover && "transition-all duration-500 hover:-translate-y-1",
         className
       )}
     >

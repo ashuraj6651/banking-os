@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
@@ -14,15 +14,18 @@ import {
   Check,
   ChevronDown,
   Search,
-  Loader2,
   X,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
 import { Ring } from "../Ring";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSyllabus, useToggleSyllabus } from "@/lib/hooks";
 import { SYLLABUS, TOTAL_TOPICS, SyllabusSubject } from "@/lib/syllabus";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const ICONS: Record<string, typeof Brain> = {
   Brain,
@@ -33,6 +36,60 @@ const ICONS: Record<string, typeof Brain> = {
   Newspaper,
   Building2,
 };
+
+function SyllabusSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Header skeleton */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-28 rounded-full" />
+          <Skeleton className="h-8 w-56 rounded-lg" />
+          <Skeleton className="h-4 w-96 max-w-full rounded-lg" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-24 rounded-lg" />
+          <Skeleton className="h-9 w-28 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Progress card skeleton */}
+      <div className="glass-card rounded-3xl p-6">
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+          <Skeleton className="h-[120px] w-[120px] rounded-full" />
+          <div className="flex-1 space-y-3">
+            <Skeleton className="h-5 w-40 rounded-lg" />
+            <Skeleton className="h-4 w-64 max-w-full rounded-lg" />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search skeleton */}
+      <Skeleton className="h-11 w-full rounded-2xl" />
+
+      {/* Subject cards skeleton */}
+      <div className="space-y-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="glass-card rounded-3xl p-5">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-12 w-12 rounded-2xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-36 rounded-lg" />
+                <Skeleton className="h-1.5 w-full rounded-full" />
+              </div>
+              <Skeleton className="h-8 w-8 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function Syllabus() {
   const { data, isLoading } = useSyllabus();
@@ -49,8 +106,11 @@ export function Syllabus() {
     return m;
   }, [data]);
 
-  const isChecked = (subject: string, topic: string) =>
-    checkedMap.get(`${subject}|${topic}`) ?? false;
+  const isChecked = useCallback(
+    (subject: string, topic: string) =>
+      checkedMap.get(`${subject}|${topic}`) ?? false,
+    [checkedMap]
+  );
 
   function toggleTopic(subject: string, topic: string, e?: React.MouseEvent) {
     e?.stopPropagation();
@@ -71,6 +131,31 @@ export function Syllabus() {
   }
   function collapseAll() {
     setOpenSubjects(new Set());
+  }
+
+  function markAllComplete(subject: SyllabusSubject) {
+    const allTopics = subject.groups.flatMap((g) => g.topics);
+    const unchecked = allTopics.filter((t) => !isChecked(subject.subject, t));
+    if (unchecked.length === 0) {
+      toast.info("All topics already marked complete!");
+      return;
+    }
+    toast.loading(`Marking ${unchecked.length} topics complete…`, { id: "mark-all" });
+    unchecked.forEach((topic) => {
+      toggle.mutate(
+        { subject: subject.subject, topic },
+        {
+          onSuccess: () => {
+            // Invalidate will happen from the hook; toast dismissed on last
+          },
+        }
+      );
+    });
+    // Dismiss after a short delay since each mutation invalidates
+    setTimeout(() => {
+      toast.dismiss("mark-all");
+      toast.success(`${subject.subject}: all topics marked complete`);
+    }, 1500);
   }
 
   // filtered syllabus based on search query
@@ -102,6 +187,8 @@ export function Syllabus() {
     ? new Set(filteredSyllabus.map((s) => s.subject))
     : openSubjects;
 
+  if (isLoading) return <SyllabusSkeleton />;
+
   return (
     <div className="space-y-6">
       <ViewHeader
@@ -113,13 +200,13 @@ export function Syllabus() {
           <div className="flex items-center gap-2">
             <button
               onClick={expandAll}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:bg-white/10"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:bg-white/10 transition-colors"
             >
               Expand all
             </button>
             <button
               onClick={collapseAll}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:bg-white/10"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 hover:bg-white/10 transition-colors"
             >
               Collapse all
             </button>
@@ -127,7 +214,7 @@ export function Syllabus() {
         }
       />
 
-      {/* overall progress bar */}
+      {/* Progress summary bar */}
       <GlassCard hover={false} className="relative overflow-hidden">
         <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="relative flex flex-col items-center gap-6 p-6 sm:flex-row sm:items-center">
@@ -137,6 +224,15 @@ export function Syllabus() {
             <p className="mt-1 text-sm text-white/50">
               {totalChecked} of {TOTAL_TOPICS} topics marked complete across {SYLLABUS.length} sections.
             </p>
+            {/* Thin progress bar */}
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-violet-500 to-electric-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${overallPct}%` }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {SYLLABUS.map((s) => {
                 const subjectTotal = s.groups.reduce((a, g) => a + g.topics.length, 0);
@@ -151,7 +247,7 @@ export function Syllabus() {
                       <span className="truncate text-[11px] font-medium text-white/70">{s.subject}</span>
                     </div>
                     <div className="mt-1.5 text-lg font-bold" style={{ color: s.color }}>{pct}%</div>
-                    <div className="text-[10px] text-white/35">{subjectDone}/{subjectTotal}</div>
+                    <div className="text-[10px] text-white/35">{subjectDone}/{subjectTotal} topics</div>
                   </div>
                 );
               })}
@@ -178,12 +274,6 @@ export function Syllabus() {
         </div>
       </div>
 
-      {isLoading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-white/40">
-          <Loader2 className="h-5 w-5 animate-spin" /> Loading syllabus…
-        </div>
-      )}
-
       {/* subject sections */}
       <div className="space-y-4">
         {filteredSyllabus.map((s, si) => (
@@ -194,16 +284,34 @@ export function Syllabus() {
             onToggle={() => toggleSubjectOpen(s.subject)}
             isChecked={isChecked}
             onToggleTopic={(topic) => toggleTopic(s.subject, topic)}
+            onMarkAll={() => markAllComplete(s)}
             delay={si * 0.04}
             query={query}
           />
         ))}
       </div>
 
+      {/* Improved empty state */}
       {filteredSyllabus.length === 0 && !isLoading && (
         <GlassCard hover={false}>
-          <div className="p-10 text-center text-sm text-white/40">
-            No topics match &ldquo;{query}&rdquo;.
+          <div className="flex flex-col items-center gap-4 p-12 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+              <Search className="h-6 w-6 text-white/20" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white/60">
+                No topics match &ldquo;{query}&rdquo;
+              </p>
+              <p className="mt-1 text-xs text-white/30">
+                Try a different search term, or check the spelling.
+              </p>
+            </div>
+            <button
+              onClick={() => setQuery("")}
+              className="mt-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/80"
+            >
+              Clear search
+            </button>
           </div>
         </GlassCard>
       )}
@@ -231,6 +339,7 @@ function SubjectCard({
   onToggle,
   isChecked,
   onToggleTopic,
+  onMarkAll,
   delay,
   query,
 }: {
@@ -239,6 +348,7 @@ function SubjectCard({
   onToggle: () => void;
   isChecked: (subject: string, topic: string) => boolean;
   onToggleTopic: (topic: string) => void;
+  onMarkAll: () => void;
   delay: number;
   query: string;
 }) {
@@ -248,6 +358,7 @@ function SubjectCard({
     .flatMap((g) => g.topics)
     .filter((t) => isChecked(subject.subject, t)).length;
   const pct = subjectTotal > 0 ? Math.round((subjectDone / subjectTotal) * 100) : 0;
+  const allDone = subjectDone === subjectTotal && subjectTotal > 0;
 
   return (
     <motion.div
@@ -267,11 +378,15 @@ function SubjectCard({
           >
             <Icon className="h-6 w-6" />
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-semibold text-white">{subject.subject}</h3>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: `${subject.color}18`, color: subject.color }}>{pct}%</span>
-              <span className="text-xs text-white/40">· {subjectTotal} topics</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: `${subject.color}18`, color: subject.color }}>
+                {pct}%
+              </span>
+              <span className="text-xs text-white/40">
+                {subjectDone}/{subjectTotal} topics
+              </span>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -284,12 +399,11 @@ function SubjectCard({
                 />
               </div>
               <span className="text-xs font-medium" style={{ color: subject.color }}>{pct}%</span>
-              <span className="text-[11px] text-white/35">{subjectDone}/{subjectTotal}</span>
             </div>
           </div>
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-white/50"
           >
             <ChevronDown className="h-4 w-4" />
@@ -307,6 +421,29 @@ function SubjectCard({
               className="overflow-hidden"
             >
               <div className="border-t border-white/[0.06] p-4 pt-5">
+                {/* Mark all button */}
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-xs text-white/40">
+                    {subjectDone} of {subjectTotal} topics completed
+                  </div>
+                  {!allDone && (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={onMarkAll}
+                      className="btn-press inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Mark all complete
+                    </motion.button>
+                  )}
+                  {allDone && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-300">
+                      <Check className="h-3 w-3" />
+                      All done
+                    </span>
+                  )}
+                </div>
+
                 {subject.groups.map((g, gi) => {
                   const groupDone = g.topics.filter((t) => isChecked(subject.subject, t)).length;
                   return (
@@ -319,8 +456,9 @@ function SubjectCard({
                         {g.topics.map((topic) => {
                           const checked = isChecked(subject.subject, topic);
                           return (
-                            <button
+                            <motion.button
                               key={topic}
+                              whileTap={{ scale: 0.97 }}
                               onClick={(e) => onToggleTopic(topic)}
                               className={cn(
                                 "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-all",
@@ -330,7 +468,7 @@ function SubjectCard({
                               )}
                             >
                               <motion.span
-                                whileTap={{ scale: 0.85 }}
+                                whileTap={{ scale: 0.8 }}
                                 className={cn(
                                   "grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-all",
                                   checked
@@ -339,15 +477,24 @@ function SubjectCard({
                                 )}
                               >
                                 {checked && (
-                                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 15 }}>
+                                  <motion.div
+                                    initial={{ scale: 0, rotate: -90 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                                  >
                                     <Check className="h-3.5 w-3.5 text-emerald-300" />
                                   </motion.div>
                                 )}
                               </motion.span>
-                              <span className={cn("flex-1 leading-tight", checked ? "text-white/40 line-through" : "text-white/80")}>
+                              <span
+                                className={cn(
+                                  "flex-1 leading-tight transition-colors",
+                                  checked ? "text-white/40 line-through" : "text-white/80"
+                                )}
+                              >
                                 {highlightText(topic, query)}
                               </span>
-                            </button>
+                            </motion.button>
                           );
                         })}
                       </div>

@@ -108,7 +108,7 @@ export function Wordmark({
     size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
 
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
+    <div className={cn("flex items-center gap-2.5 wordmark-glow", className)}>
       <div
         className={cn(
           "relative grid place-items-center rounded-xl bg-gradient-to-br from-violet-500 via-electric-500 to-cyan-400 shadow-[0_4px_20px_-4px_rgba(139,92,246,0.7)]",
@@ -138,10 +138,12 @@ export function Wordmark({
 export function GlowBadge({
   children,
   color = "violet",
+  animated = false,
   className,
 }: {
   children: React.ReactNode;
   color?: "violet" | "electric" | "cyan" | "amber" | "emerald";
+  animated?: boolean;
   className?: string;
 }) {
   const colors: Record<string, string> = {
@@ -155,6 +157,7 @@ export function GlowBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        animated && "animated-border-gradient",
         colors[color],
         className
       )}

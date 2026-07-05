@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useCallback } from "react";
 import {
   ArrowRight,
   Sparkles,
@@ -21,7 +21,6 @@ import { Aurora } from "../Aurora";
 import { MagneticButton, MagneticGhost } from "../MagneticButton";
 import { GlassCard } from "../GlassCard";
 import { Ring, MiniRing } from "../Ring";
-import { Counter } from "../Counter";
 import { Wordmark, SectionHeading, Reveal, Eyebrow } from "../Primitives";
 import {
   STATS,
@@ -32,7 +31,6 @@ import {
   FAQS,
   EXAMS,
 } from "./landing-data";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function Landing() {
@@ -42,8 +40,23 @@ export function Landing() {
   const y = useTransform(scrollYProgress, [0, 1], [0, 120]);
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
+  const handleRipple = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const btn = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const x = e.clientX - rect.left - size / 2;
+    const y = e.clientY - rect.top - size / 2;
+    const ripple = document.createElement("span");
+    ripple.className = "ripple";
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    btn.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+  }, []);
+
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen noise-bg">
       <Aurora />
 
       {/* ===== Nav ===== */}
@@ -92,10 +105,10 @@ export function Landing() {
             </Reveal>
             <Reveal delay={0.15}>
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-                <MagneticButton onClick={startAuth} className="px-7 py-3.5 text-base">
+                <MagneticButton onClick={startAuth} className="btn-press ripple-container px-7 py-3.5 text-base" onMouseDown={handleRipple}>
                   Enter Mission Control <ArrowRight className="h-4 w-4" />
                 </MagneticButton>
-                <MagneticGhost onClick={startAuth} className="px-6 py-3 text-base">
+                <MagneticGhost onClick={startAuth} className="btn-press px-6 py-3 text-base">
                   <Sparkles className="h-4 w-4 text-violet-300" /> Watch the AI Coach
                 </MagneticGhost>
               </div>
@@ -112,6 +125,46 @@ export function Landing() {
               </div>
             </Reveal>
           </motion.div>
+
+          {/* ===== Floating particle dots ===== */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+            {[
+              { left: "10%", top: "25%", delay: "0s", duration: "7s", size: "3px", color: "rgba(139,92,246,0.5)" },
+              { left: "25%", top: "60%", delay: "1.5s", duration: "8s", size: "2px", color: "rgba(34,211,238,0.4)" },
+              { left: "45%", top: "15%", delay: "3s", duration: "6s", size: "2px", color: "rgba(139,92,246,0.3)" },
+              { left: "65%", top: "45%", delay: "0.8s", duration: "9s", size: "3px", color: "rgba(34,211,238,0.5)" },
+              { left: "80%", top: "20%", delay: "2s", duration: "7.5s", size: "2px", color: "rgba(139,92,246,0.4)" },
+              { left: "90%", top: "65%", delay: "4s", duration: "6.5s", size: "2px", color: "rgba(34,211,238,0.3)" },
+              { left: "15%", top: "80%", delay: "1s", duration: "8s", size: "2px", color: "rgba(139,92,246,0.35)" },
+              { left: "55%", top: "75%", delay: "2.5s", duration: "7s", size: "3px", color: "rgba(34,211,238,0.45)" },
+              { left: "35%", top: "35%", delay: "3.5s", duration: "9s", size: "2px", color: "rgba(167,139,250,0.4)" },
+              { left: "75%", top: "80%", delay: "0.5s", duration: "8.5s", size: "2px", color: "rgba(139,92,246,0.3)" },
+            ].map((p, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  left: p.left,
+                  top: p.top,
+                  width: p.size,
+                  height: p.size,
+                  backgroundColor: p.color,
+                  animation: `particle-float ${p.duration} ease-in-out ${p.delay} infinite`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* ===== Scroll-down indicator ===== */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 scroll-indicator" aria-hidden="true">
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/30">Scroll</span>
+              <svg width="16" height="24" viewBox="0 0 16 24" fill="none" className="text-white/30">
+                <rect x="1" y="1" width="14" height="22" rx="7" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="8" cy="8" r="2" fill="currentColor" />
+              </svg>
+            </div>
+          </div>
 
           {/* ===== Floating dashboard preview ===== */}
           <Reveal delay={0.25} y={40}>
@@ -151,8 +204,8 @@ export function Landing() {
             {FEATURES.map((f, i) => {
               const Icon = ICON_MAP[f.icon] ?? Sparkles;
               return (
-                <Reveal key={f.title} delay={(i % 3) * 0.05}>
-                  <GlassCard className="h-full">
+                <Reveal key={f.title} delay={(i % 3) * 0.08}>
+                  <GlassCard className="btn-press h-full">
                     <div className="p-6">
                       <div
                         className="grid h-11 w-11 place-items-center rounded-2xl border"
@@ -198,7 +251,7 @@ export function Landing() {
                       </div>
                     ))}
                   </div>
-                  <MagneticButton onClick={startAuth} className="mt-7">
+                  <MagneticButton onClick={startAuth} className="btn-press ripple-container mt-7" onMouseDown={handleRipple}>
                     Meet your Coach <ArrowRight className="h-4 w-4" />
                   </MagneticButton>
                 </div>
@@ -364,7 +417,7 @@ export function Landing() {
                 <p className="max-w-xl text-base text-white/55">
                   Join 48,000+ aspirants who replaced scattered prep with one operating system.
                 </p>
-                <MagneticButton onClick={startAuth} className="mt-2 px-8 py-4 text-base">
+                <MagneticButton onClick={startAuth} className="btn-press ripple-container mt-2 px-8 py-4 text-base" onMouseDown={handleRipple}>
                   Launch BankOS <ArrowRight className="h-4 w-4" />
                 </MagneticButton>
               </div>

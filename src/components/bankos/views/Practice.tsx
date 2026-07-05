@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layers, Bookmark, BookmarkCheck, Filter, Check, ChevronRight, Infinity as Inf, Loader2, RefreshCw } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
@@ -17,14 +17,49 @@ export function Practice() {
   const { startSession } = useBankOS();
   const [subject, setSubject] = useState<(typeof SUBJECTS)[number]>("All");
   const [diff, setDiff] = useState<(typeof DIFFS)[number]>("All");
-  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+  const [bookmarks, setBookmarks] = useState<Set<string>>(() => {
+    // Restore bookmarks from localStorage
+    try {
+      const saved = localStorage.getItem("bankos_bookmarks");
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   const [answered, setAnswered] = useState<Record<string, { sel: number; correct: boolean; explanation: string }>>({});
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const submit = useSubmitAttempt();
 
+  // Read filter preference from localStorage (set by CurrentAffairs "Take Quiz")
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("bankos_practice_filter");
+      if (saved) {
+        const filter = JSON.parse(saved) as { subject: string; difficulty: string };
+        if (filter.subject && SUBJECTS.includes(filter.subject as typeof SUBJECTS[number])) {
+          setSubject(filter.subject as typeof SUBJECTS[number]);
+        }
+        if (filter.difficulty && DIFFS.includes(filter.difficulty as typeof DIFFS[number])) {
+          setDiff(filter.difficulty as typeof DIFFS[number]);
+        }
+        localStorage.removeItem("bankos_practice_filter");
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  // Persist bookmarks to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("bankos_bookmarks", JSON.stringify([...bookmarks]));
+    } catch {
+      // Ignore
+    }
+  }, [bookmarks]);
+
   const { data, isLoading, refetch } = useQuestions(subject, diff);
-  // Force re-query when refreshKey changes
   const filtered = data?.questions ?? [];
 
   const answeredCount = Object.keys(answered).length;
@@ -164,8 +199,22 @@ export function Practice() {
       {/* Question list */}
       <div className="space-y-4">
         {isLoading && (
-          <div className="flex items-center justify-center gap-2 py-16 text-white/40">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading questions…
+          <div className="space-y-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton-shimmer rounded-3xl p-6">
+                <div className="flex gap-2">
+                  <div className="h-5 w-16 rounded-lg bg-white/[0.06]" />
+                  <div className="h-5 w-12 rounded-lg bg-white/[0.06]" />
+                  <div className="h-5 w-10 rounded-lg bg-white/[0.06]" />
+                </div>
+                <div className="mt-4 h-5 w-3/4 rounded bg-white/[0.06]" />
+                <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
+                  {[0, 1, 2, 3].map((j) => (
+                    <div key={j} className="h-12 rounded-xl bg-white/[0.04]" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
         <AnimatePresence mode="popLayout">

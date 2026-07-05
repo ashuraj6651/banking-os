@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, Mail, Lock, User, Sparkles, Shield, Cloud } from "lucide-react";
+import { ArrowRight, ArrowLeft, Mail, Lock, User, Sparkles, Shield, Cloud, Eye, EyeOff } from "lucide-react";
 import { useBankOS } from "@/lib/store";
 import { useLogin, useRegister, useAuth } from "@/lib/hooks";
 import { Wordmark, Eyebrow } from "./Primitives";
@@ -17,6 +17,7 @@ export function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [showPw, setShowPw] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,13 +138,21 @@ export function Auth() {
                 </Field>
                 <Field icon={Lock} label="Password">
                   <input
-                    type="password"
+                    type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={mode === "register" ? "At least 6 characters" : "••••••••"}
                     autoComplete={mode === "login" ? "current-password" : "new-password"}
                     className="w-full bg-transparent text-white placeholder:text-white/30 focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="shrink-0 text-white/30 transition-colors hover:text-white/60"
+                    tabIndex={-1}
+                  >
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </Field>
 
                 <button

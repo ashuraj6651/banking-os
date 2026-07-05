@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { User, Trophy, Flame, Zap, Target, Crown, Flag, Sparkles, Award, Loader2 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
@@ -8,6 +9,7 @@ import { Ring } from "../Ring";
 import { Counter } from "../Counter";
 import { useProfileStats } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const ACHIEVEMENTS = [
   { key: "first-session", name: "First Session", desc: "Completed your first focus session", icon: "Flag" },
@@ -26,6 +28,34 @@ const HEAT_COLOR = ["bg-white/[0.04]", "bg-violet-500/30", "bg-violet-500/55", "
 
 export function Profile() {
   const { data, isLoading } = useProfileStats();
+  const toastedRef = useRef(false);
+
+  // Achievement unlock detection
+  useEffect(() => {
+    if (isLoading || !data?.stats?.achievements || toastedRef.current) return;
+    toastedRef.current = true;
+
+    const current: string[] = data.stats.achievements;
+    const seenRaw = typeof window !== "undefined" ? localStorage.getItem("bankos_seen_achievements") : null;
+    const seen: string[] = seenRaw ? JSON.parse(seenRaw) : [];
+
+    const newOnes = current.filter((k) => !seen.includes(k));
+    if (newOnes.length > 0) {
+      localStorage.setItem("bankos_seen_achievements", JSON.stringify(current));
+      const timer = setTimeout(() => {
+        newOnes.forEach((key) => {
+          const ach = ACHIEVEMENTS.find((a) => a.key === key);
+          if (ach) {
+            toast.success(`🏆 ${ach.name}`, {
+              description: ach.desc,
+              duration: 4000,
+            });
+          }
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, data?.stats?.achievements]);
 
   if (isLoading) {
     return (

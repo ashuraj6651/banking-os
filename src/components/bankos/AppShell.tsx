@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   Sparkles,
   Layers,
   Timer,
+  Clock,
   BarChart3,
   Globe2,
   Network,
@@ -43,11 +44,15 @@ import { CurrentAffairs } from "./views/CurrentAffairs";
 import { Profile } from "./views/Profile";
 import { SettingsView } from "./views/SettingsView";
 import { Syllabus } from "./views/Syllabus";
-import { ListChecks } from "lucide-react";
+import { StudyTimer } from "./views/StudyTimer";
+import { ListChecks, Target } from "lucide-react";
+import { DailyChallenge } from "./views/DailyChallenge";
 
 const NAV: { view: AppView; label: string; icon: typeof LayoutDashboard; group: string }[] = [
   { view: "mission", label: "Mission Control", icon: LayoutDashboard, group: "Operate" },
+  { view: "challenge", label: "Daily Challenge", icon: Target, group: "Operate" },
   { view: "coach", label: "AI Coach", icon: Sparkles, group: "Operate" },
+  { view: "timer", label: "Study Timer", icon: Clock, group: "Operate" },
   { view: "practice", label: "Practice", icon: Layers, group: "Train" },
   { view: "mock", label: "Mock Tests", icon: Timer, group: "Train" },
   { view: "syllabus", label: "Syllabus", icon: ListChecks, group: "Train" },
@@ -65,6 +70,7 @@ function ViewRouter() {
   const { activeView } = useBankOS();
   switch (activeView) {
     case "mission": return <MissionControl />;
+    case "challenge": return <DailyChallenge />;
     case "coach": return <Coach />;
     case "practice": return <Practice />;
     case "mock": return <MockTest />;
@@ -73,6 +79,7 @@ function ViewRouter() {
     case "skills": return <SkillTree />;
     case "current": return <CurrentAffairs />;
     case "syllabus": return <Syllabus />;
+    case "timer": return <StudyTimer />;
     case "notebook": return <Notebook />;
     case "revision": return <Revision />;
     case "profile": return <Profile />;
@@ -95,6 +102,16 @@ export function AppShell() {
   const { data: authData } = useAuth();
   const logout = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile drawer on Escape (via custom event from CommandPalette)
+  useEffect(() => {
+    function onCloseOverlays() {
+      setMobileOpen(false);
+    }
+    window.addEventListener("bankos:close-overlays", onCloseOverlays);
+    return () => window.removeEventListener("bankos:close-overlays", onCloseOverlays);
+  }, []);
+
   const profile = stats?.profile;
   const account = authData?.account;
 
@@ -206,18 +223,19 @@ export function AppShell() {
         {mobileOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              animate={{ opacity: 1, backdropFilter: "blur(8px)" }}
+              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              transition={{ duration: 0.3 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-50 bg-black/60 lg:hidden"
             />
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 360, damping: 36 }}
-              className="fixed left-0 top-0 z-50 h-screen w-[280px] border-r border-white/10 bg-[#070b16] lg:hidden"
+              className="fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-[#070b16] md:w-[320px] lg:hidden"
             >
               <div className="flex h-14 items-center justify-between px-4">
                 <Wordmark />
@@ -228,7 +246,7 @@ export function AppShell() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <nav className="h-[calc(100vh-3.5rem)] overflow-y-auto pb-6 scrollbar-premium">
+              <nav className="flex-1 overflow-y-auto scrollbar-premium pb-4">
                 {groups.map((g) => (
                   <div key={g}>
                     <NavGroup label={g} />
@@ -236,27 +254,51 @@ export function AppShell() {
                       const Icon = item.icon;
                       const active = activeView === item.view;
                       return (
-                        <button
+                        <motion.button
                           key={item.view}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => {
                             setView(item.view);
                             setMobileOpen(false);
                           }}
                           className={cn(
-                            "mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all",
+                            "relative mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all",
                             active
                               ? "bg-violet-500/15 text-white"
                               : "text-white/55 hover:bg-white/5 hover:text-white/90"
                           )}
                         >
-                          <Icon className="h-[18px] w-[18px]" />
-                          <span className="font-medium">{item.label}</span>
-                        </button>
+                          {active && (
+                            <span className="absolute left-4 h-1.5 w-1.5 rounded-full bg-violet-400 shadow-[0_0_6px_rgba(139,92,246,0.6)]" />
+                          )}
+                          <Icon className={cn("h-[18px] w-[18px]", active ? "text-violet-300" : "text-white/40")} />
+                          <span className={cn("font-medium", active && "pl-0.5")}>{item.label}</span>
+                        </motion.button>
                       );
                     })}
                   </div>
                 ))}
               </nav>
+
+              {/* Mobile user card */}
+              <div className="border-t border-white/[0.06] p-3">
+                <div className="flex items-center gap-3 rounded-2xl bg-white/[0.03] p-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-electric-500 text-xs font-bold text-white">
+                    {profile?.name?.slice(0, 2).toUpperCase() ?? "??"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-white">{profile?.name ?? "…"}</div>
+                    <div className="truncate text-[11px] text-white/40">{account?.email ?? ""}</div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    title="Sign out"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-rose-400/30 hover:text-rose-300"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </motion.aside>
           </>
         )}
