@@ -115,7 +115,7 @@ export function Wordmark({
         )}
       >
         <img
-          src="/bo-logo.png"
+          src="/BOlogo.png"
           alt="BankOS"
           className="relative max-h-full max-w-full object-contain"
         />
