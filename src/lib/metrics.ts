@@ -169,6 +169,34 @@ export function generateTodayMissions(profile: {
   }
   // ensure at least 3 missions even if hours low
   if (kept.length < 3) return base.slice(0, 3);
+
+  const hasCurrentAffairs = kept.some((m) => m.title === "Current Affairs");
+
+  if (!hasCurrentAffairs) {
+    const currentMission = {
+      title: "Current Affairs",
+      type: "current",
+      duration: 20,
+    };
+
+    if (kept.length >= 6) {
+      const replaceIndex = kept.findIndex(
+        (m) =>
+          m.title === "Quant Drill" ||
+          m.title === "Reading Comprehension" ||
+          m.title === "Puzzle Practice"
+      );
+
+      if (replaceIndex !== -1) {
+        kept[replaceIndex] = currentMission;
+      } else {
+        kept.push(currentMission);
+      }
+    } else {
+      kept.push(currentMission);
+    }
+  }
+
   return kept.slice(0, 6);
 }
 
@@ -186,8 +214,63 @@ export async function ensureTodayMissions(profileId: string) {
 
   const existing = await db.mission.findMany({
     where: { profileId, date: { gte: startOfDay, lt: endOfDay } },
+    orderBy: { order: "asc" },
   });
-  if (existing.length > 0) return existing;
+  if (existing.length > 0) {
+    const hasCurrentAffairs = existing.some((m) => m.title === "Current Affairs");
+    if (!hasCurrentAffairs) {
+      const currentMissionData = {
+        title: "Current Affairs",
+        type: "current",
+        duration: 20,
+      };
+
+      const replaceIndex = existing.findIndex(
+        (m) =>
+          m.title === "Quant Drill" ||
+          m.title === "Reading Comprehension" ||
+          m.title === "Puzzle Practice"
+      );
+
+      if (replaceIndex !== -1) {
+        await db.mission.update({
+          where: { id: existing[replaceIndex].id },
+          data: currentMissionData,
+        });
+      } else if (existing.length < 6) {
+        await db.mission.create({
+          data: {
+            date: startOfDay,
+            order: existing.length,
+            profileId,
+            ...currentMissionData,
+          },
+        });
+      } else {
+        const fallbackIndex = existing.findIndex((m) => m.title !== "Current Affairs");
+        if (fallbackIndex !== -1) {
+          await db.mission.update({
+            where: { id: existing[fallbackIndex].id },
+            data: currentMissionData,
+          });
+        } else {
+          await db.mission.create({
+            data: {
+              date: startOfDay,
+              order: existing.length,
+              profileId,
+              ...currentMissionData,
+            },
+          });
+        }
+      }
+      return db.mission.findMany({
+        where: { profileId, date: { gte: startOfDay, lt: endOfDay } },
+        orderBy: { order: "asc" },
+      });
+    }
+    return existing;
+  }
 
   const generated = generateTodayMissions(profile);
   const created: Awaited<ReturnType<typeof db.mission.create>>[] = [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -19,8 +19,20 @@ import {
   useSubmitAttempt,
   useStartSession,
   useEndSession,
+  useToggleMission,
+  Mission,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+
+// Fisher–Yates shuffle — returns a new shuffled array, doesn't mutate input.
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 // Map mission type → question subject filter
 const MISSION_SUBJECT: Record<string, string> = {
@@ -39,27 +51,34 @@ export function FocusMode() {
   const submitAttempt = useSubmitAttempt();
   const startSession = useStartSession();
   const endSessionMut = useEndSession();
+  const toggleMission = useToggleMission();
 
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [showNote, setShowNote] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [note, setNote] = useState(() => {
-    try { return localStorage.getItem("bankos_focus_note") ?? ""; } catch { return ""; }
-  });
+  const [note, setNote] = useState("");
   const [seconds, setSeconds] = useState(0);
-  const [flagged, setFlagged] = useState(false);
-  const finishedRef = useRef(false);
-  const questionStartTime = useRef(Date.now());
   const [correct, setCorrect] = useState(0);
   const [attempted, setAttempted] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [result, setResult] = useState<{ correct: boolean; answer: number; explanation: string } | null>(null);
 
-  const questions = qData?.questions ?? [];
-  const total = Math.min(8, questions.length || 8);
-  const q = questions[idx % Math.max(1, questions.length)];
+  const rawQuestions = qData?.questions ?? [];
+  // Shuffle once per fetch so the order isn't always the same DB order.
+  // Re-shuffles automatically whenever a fresh question set arrives.
+  const questions = useMemo(() => shuffle(rawQuestions), [qData]);
+  // When we loop back around (idx wraps past the end), reshuffle again so a
+  // repeated pass through a small question bank doesn't feel identical.
+  const lap = Math.floor(idx / Math.max(1, questions.length));
+  const shuffledForLap = useMemo(() => shuffle(questions), [lap, qData]);
+  const q = shuffledForLap[idx % Math.max(1, shuffledForLap.length)];
+
+  // Duration-based countdown (in seconds), derived from the mission's
+  // allotted time (falls back to 25 min if not specified).
+  const durationSec = (focusMission?.duration ?? 25) * 60;
+  const timeLeft = Math.max(0, durationSec - seconds);
 
   // start a study session on mount
   useEffect(() => {
@@ -71,14 +90,20 @@ export function FocusMode() {
   }, [focusMode]);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      if (!finishedRef.current) setSeconds((s) => s + 1);
-    }, 1000);
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
+  // Auto-finish only when the mission's actual allotted time runs out —
+  // not tied to question count anymore.
+  useEffect(() => {
+    if (seconds >= durationSec) {
+      finish();
+    }
+     
+  }, [seconds, durationSec]);
+
   function finish() {
-    finishedRef.current = true;
     if (sessionId) {
       endSessionMut.mutate({
         sessionId,
@@ -86,6 +111,11 @@ export function FocusMode() {
         correctCount: correct,
         durationSec: seconds,
       });
+    }
+    // Mark the mission as complete on Mission Control so progress/checkbox
+    // actually reflects the work done here — this was previously never wired up.
+    if (focusMission && !focusMission.done && attempted > 0) {
+      toggleMission.mutate(focusMission.id);
     }
     endSession();
   }
@@ -95,12 +125,11 @@ export function FocusMode() {
     setSelected(i);
     setRevealed(true);
     setAttempted((a) => a + 1);
-    const perQuestionTime = Math.round((Date.now() - questionStartTime.current) / 1000);
     const res = await submitAttempt.mutateAsync({
       questionId: q.id,
       selected: i,
       context: "focus",
-      timeTakenSec: perQuestionTime,
+      timeTakenSec: seconds,
     });
     setResult(res);
     if (res.correct) setCorrect((c) => c + 1);
@@ -111,20 +140,21 @@ export function FocusMode() {
     setRevealed(false);
     setResult(null);
     setShowHint(false);
-    setFlagged(false);
     setIdx((i) => i + 1);
-    questionStartTime.current = Date.now();
-    if (attempted + 1 >= total) {
-      // session done
-      setTimeout(finish, 400);
-    }
+    // NOTE: session no longer auto-finishes just because we've cycled
+    // through all available questions once — it keeps looping (idx % length)
+    // until the mission's actual time is up. See the time-based useEffect.
   }
 
-  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const ss = String(seconds % 60).padStart(2, "0");
+  const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const ss = String(timeLeft % 60).padStart(2, "0");
 
-  if (attempted >= total && revealed) {
-    return <SessionComplete correct={correct} total={total} seconds={seconds} onFinish={finish} />;
+  // Session ends ONLY when the mission's actual time is up, or there were
+  // never any questions to begin with. Running out of a small question bank
+  // no longer ends the session early — it loops back and keeps going.
+  const noQuestionsAtAll = questions.length === 0 && seconds > 5; // give the API a moment to load
+  if (seconds >= durationSec || noQuestionsAtAll) {
+    return <SessionComplete correct={correct} total={attempted} seconds={seconds} onFinish={finish} />;
   }
 
   return (
@@ -175,20 +205,21 @@ export function FocusMode() {
         {/* ===== Progress ===== */}
         <div className="px-5 sm:px-8">
           <div className="flex items-center justify-between text-xs text-white/40">
-            <span>Question {Math.min(attempted + 1, total)} of {total}</span>
-            <span>{Math.round((attempted / total) * 100)}% complete</span>
+            <span>Question {attempted + 1}</span>
+            <span>{Math.round((seconds / durationSec) * 100)}% of session used</span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-violet-500 via-electric-500 to-cyan-400"
-              animate={{ width: `${(attempted / total) * 100}%` }}
+              animate={{ width: `${Math.min(100, (seconds / durationSec) * 100)}%` }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             />
           </div>
         </div>
 
         {/* ===== Question ===== */}
-        <div className="flex flex-1 items-center justify-center px-5 py-6 sm:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+          <div className="mx-auto flex min-h-full max-w-2xl items-center justify-center">
           {!q ? (
             <div className="flex items-center gap-3 text-white/50">
               <Sparkles className="h-5 w-5 animate-pulse" /> Loading questions…
@@ -297,6 +328,7 @@ export function FocusMode() {
               )}
             </motion.div>
           )}
+          </div>
         </div>
 
         {/* ===== Bottom dock ===== */}
@@ -314,16 +346,8 @@ export function FocusMode() {
             >
               <NotebookPen className="h-4 w-4" /> Notebook
             </button>
-            <button
-              onClick={() => setFlagged((v) => !v)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
-                flagged
-                  ? "border-amber-400/40 bg-amber-500/20 text-amber-200"
-                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
-              )}
-            >
-              <Flag className={cn("h-4 w-4", flagged && "fill-amber-300 text-amber-300")} /> Flag
+            <button className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10">
+              <Flag className="h-4 w-4" /> Flag
             </button>
           </div>
 
@@ -333,8 +357,15 @@ export function FocusMode() {
               disabled={!revealed}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-b from-violet-500 to-electric-600 px-6 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(139,92,246,0.6)] transition-shadow hover:shadow-[0_10px_30px_-6px_rgba(139,92,246,0.85)] disabled:opacity-40"
             >
-              {attempted + 1 >= total ? "Finish Session" : "Next"}
+              Next
               <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={finish}
+              disabled={!revealed}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 disabled:opacity-40"
+            >
+              Finish Session
             </button>
           </div>
         </div>
@@ -356,10 +387,7 @@ export function FocusMode() {
               </div>
               <textarea
                 value={note}
-                onChange={(e) => {
-                  setNote(e.target.value);
-                  try { localStorage.setItem("bankos_focus_note", e.target.value); } catch {}
-                }}
+                onChange={(e) => setNote(e.target.value)}
                 placeholder="Jot down a concept, shortcut or doubt…"
                 className="mt-4 h-48 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/40 focus:outline-none"
               />

@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Account {
@@ -35,6 +36,7 @@ model Profile {
   accountId        String?  @unique
   account          Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   name             String
+  avatarUrl        String?
   exam             String
   targetDate       DateTime
   studyHoursPerDay Int      @default(4)

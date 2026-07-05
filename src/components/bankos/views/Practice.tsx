@@ -59,11 +59,22 @@ export function Practice() {
     }
   }, [bookmarks]);
 
-  const { data, isLoading, refetch } = useQuestions(subject, diff);
+  const { data, isLoading, isError } = useQuestions(subject, diff, refreshKey);
   const filtered = data?.questions ?? [];
 
   const answeredCount = Object.keys(answered).length;
   const allAnswered = filtered.length > 0 && answeredCount >= filtered.length;
+
+  useEffect(() => {
+    if (isRefreshing && !isLoading) {
+      if (isError) {
+        toast.error("Could not refresh questions");
+      } else {
+        toast.success("Fresh questions loaded");
+      }
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, isLoading, isError]);
 
   function toggleBookmark(id: string) {
     setBookmarks((prev) => {
@@ -74,18 +85,10 @@ export function Practice() {
     });
   }
 
-  async function refreshQuestions() {
+  function refreshQuestions() {
     setIsRefreshing(true);
     setAnswered({});
-    try {
-      await refetch();
-      setRefreshKey((k) => k + 1);
-      toast.success("Fresh questions loaded");
-    } catch {
-      toast.error("Could not refresh questions");
-    } finally {
-      setIsRefreshing(false);
-    }
+    setRefreshKey((k) => k + 1);
   }
 
   // Auto-refresh when all questions are answered

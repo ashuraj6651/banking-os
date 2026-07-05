@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -19,6 +19,7 @@ import {
   Trash2,
   Info,
   Heart,
+  User,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
@@ -32,6 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,9 +46,25 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useExportBackup, useImportBackup, useAuth, useLogout } from "@/lib/hooks";
+import { useExportBackup, useImportBackup, useAuth, useLogout, useProfile, useUpdateProfile } from "@/lib/hooks";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const PRESET_AVATARS = [
+  { key: "Aurora", url: "https://api.dicebear.com/6.x/adventurer/svg?seed=Aurora" },
+  { key: "Nova", url: "https://api.dicebear.com/6.x/adventurer/svg?seed=Nova" },
+  { key: "Orion", url: "https://api.dicebear.com/6.x/adventurer/svg?seed=Orion" },
+  { key: "Indigo", url: "https://api.dicebear.com/6.x/adventurer/svg?seed=Indigo" },
+  { key: "Lumen", url: "https://api.dicebear.com/6.x/adventurer/svg?seed=Lumen" },
+];
+
+const PRESET_GOALS = [
+  "SBI PO",
+  "IBPS PO",
+  "LIC AAO",
+  "RBI Grade B",
+  "UPSC Prelims",
+];
 
 function useSetting<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(() => {
@@ -92,6 +111,37 @@ export function SettingsView() {
   const [defaultDifficulty, setDefaultDifficulty] = useSetting("defaultDifficulty", "mixed");
   const [focusTimer, setFocusTimer] = useSetting("focusTimer", "25");
 
+  const profileQuery = useProfile();
+  const updateProfile = useUpdateProfile();
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profileGoal, setProfileGoal] = useState("");
+
+  useEffect(() => {
+    const profile = profileQuery.data?.profile;
+    if (!profile) return;
+    setProfileName(profile.name ?? "");
+    setProfileAvatarUrl(profile.avatarUrl ?? "");
+    setProfileGoal(profile.roadmap ?? "");
+  }, [profileQuery.data?.profile]);
+
+  async function saveProfileSettings() {
+    try {
+      await updateProfile.mutateAsync({
+        name: profileName,
+        avatarUrl: profileAvatarUrl || null,
+        goal: profileGoal,
+        roadmap: profileGoal,
+      });
+      toast.success("Profile updated");
+      // Refresh the page to update avatar and name everywhere
+      setTimeout(() => window.location.reload(), 800);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save profile.";
+      toast.error(message || "Could not save profile.");
+    }
+  }
+
   function flip(group: "notif" | "ai" | "focus", key: string) {
     if (group === "notif") setNotif((p) => ({ ...p, [key]: !p[key as keyof typeof p] }));
     if (group === "ai") setAi((p) => ({ ...p, [key]: !p[key as keyof typeof p] }));
@@ -113,6 +163,91 @@ export function SettingsView() {
         title="Settings"
         subtitle="Tune BankOS to match how you study best."
       />
+
+      <GlassCard hover={false}>
+        <Section icon={User} title="Profile" color="#22d3ee" />
+        <div className="space-y-4 px-6 pb-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-white">Name</div>
+              <Input
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                placeholder="Your display name"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-white">Profile avatar</div>
+                  <div className="text-xs text-white/40">Choose a premade avatar for your account.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileAvatarUrl("")}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 transition hover:bg-white/10"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {PRESET_AVATARS.map((avatar) => (
+                  <button
+                    key={avatar.key}
+                    type="button"
+                    onClick={() => setProfileAvatarUrl(avatar.url)}
+                    className={cn(
+                      "rounded-2xl border p-0.5 transition",
+                      profileAvatarUrl === avatar.url
+                        ? "border-violet-300 bg-violet-500/10"
+                        : "border-white/10 bg-white/5 hover:border-violet-400/40"
+                    )}
+                  >
+                    <div className="overflow-hidden rounded-xl bg-[#0b1120] p-2">
+                      <img src={avatar.url} alt={avatar.key} className="h-12 w-12 rounded-xl object-cover" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-white">Goal summary</div>
+              <div className="text-xs text-white/40">Pick one of the preset goals to keep your profile concise.</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {PRESET_GOALS.map((goal) => (
+                  <button
+                    key={goal}
+                    type="button"
+                    onClick={() => setProfileGoal(goal)}
+                    className={cn(
+                      "rounded-2xl border px-3 py-2 text-left text-sm transition",
+                      profileGoal === goal
+                        ? "border-violet-300 bg-violet-500/10 text-white"
+                        : "border-white/10 bg-white/5 text-white/70 hover:border-violet-400/40 hover:bg-white/10"
+                    )}
+                  >
+                    {goal}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileGoal("")}
+                className="text-xs text-white/50 hover:text-white"
+              >
+                Clear selection
+              </button>
+            </div>
+            <button
+              onClick={saveProfileSettings}
+              disabled={updateProfile.isPending}
+              className="btn-press inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-sky-500/80 to-blue-600 px-4 py-2 text-sm font-semibold text-white transition-shadow hover:shadow-[0_6px_26px_-12px_rgba(59,130,246,0.6)] disabled:opacity-60"
+            >
+              {updateProfile.isPending ? "Saving…" : "Save profile"}
+            </button>
+          </div>
+        </div>
+      </GlassCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ===== Study Preferences ===== */}

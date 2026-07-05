@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: "invalid action" }, { status: 400 });
 }
 
+export async function DELETE() {
+  const profile = await getProfile();
+  if (!profile) return NextResponse.json({ error: "no profile" }, { status: 404 });
+
+  const deleted = await db.mockTest.deleteMany({ where: { profileId: profile.id } });
+  return NextResponse.json({ deleted: deleted.count });
+}
+
 // GET /api/mocks — list completed mocks
 export async function GET() {
   const profile = await getProfile();

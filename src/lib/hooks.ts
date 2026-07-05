@@ -28,6 +28,7 @@ async function jfetch<T>(url: string, opts?: RequestInit): Promise<T> {
 export type Profile = {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   exam: string;
   targetDate: string;
   studyHoursPerDay: number;
@@ -79,6 +80,26 @@ export function useProfile() {
   });
 }
 
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name?: string;
+      avatarUrl?: string | null;
+      exam?: string;
+      goal?: string;
+      roadmap?: string;
+    }) => jfetch<{ profile: Profile }>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profile-stats"] });
+    },
+  });
+}
+
 export function useProfileStats() {
   return useQuery({
     queryKey: ["profile-stats"],
@@ -120,12 +141,13 @@ export function useToggleMission() {
   });
 }
 
-export function useQuestions(subject?: string, difficulty?: string) {
+export function useQuestions(subject?: string, difficulty?: string, refreshKey = 0) {
   const params = new URLSearchParams();
   if (subject && subject !== "All") params.set("subject", subject);
   if (difficulty && difficulty !== "All") params.set("difficulty", difficulty);
+  if (refreshKey > 0) params.set("refresh", "true");
   return useQuery({
-    queryKey: ["questions", subject, difficulty],
+    queryKey: ["questions", subject, difficulty, refreshKey],
     queryFn: () => jfetch<{ questions: Question[] }>(`/api/questions?${params}`),
     staleTime: 5 * 60 * 1000, // 5 min stale time for questions
   });
@@ -374,6 +396,21 @@ export function useCompleteMock() {
       jfetch("/api/mocks", {
         method: "POST",
         body: JSON.stringify({ action: "complete", ...body }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mocks"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["profile-stats"] });
+    },
+  });
+}
+
+export function useClearMocks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      jfetch<{ deleted: number }>("/api/mocks", {
+        method: "DELETE",
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mocks"] });

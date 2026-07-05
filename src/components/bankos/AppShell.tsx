@@ -28,6 +28,7 @@ import { useBankOS } from "@/lib/store";
 import { AppView } from "@/lib/data";
 import { useProfileStats, useLogout, useAuth } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Wordmark } from "./Primitives";
 import { CommandPalette } from "./CommandPalette";
 import { FocusMode } from "./views/FocusMode";
@@ -171,9 +172,16 @@ export function AppShell() {
         {/* user card */}
         <div className="border-t border-white/[0.06] p-3">
           <div className="flex items-center gap-3 rounded-2xl bg-white/[0.03] p-3">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-electric-500 text-xs font-bold text-white">
-              {profile?.name?.slice(0, 2).toUpperCase() ?? "??"}
-            </div>
+            {profile?.avatarUrl ? (
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={profile.avatarUrl} alt={profile.name ?? "Avatar"} />
+                <AvatarFallback>{profile?.name?.slice(0, 2).toUpperCase() ?? "??"}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-electric-500 text-xs font-bold text-white">
+                {profile?.name?.slice(0, 2).toUpperCase() ?? "??"}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-white">{profile?.name ?? "…"}</div>
               <div className="truncate text-[11px] text-white/40">{account?.email ?? ""}</div>
@@ -283,9 +291,16 @@ export function AppShell() {
               {/* Mobile user card */}
               <div className="border-t border-white/[0.06] p-3">
                 <div className="flex items-center gap-3 rounded-2xl bg-white/[0.03] p-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-electric-500 text-xs font-bold text-white">
-                    {profile?.name?.slice(0, 2).toUpperCase() ?? "??"}
-                  </div>
+                  {profile?.avatarUrl ? (
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={profile.avatarUrl} alt={profile.name ?? "Avatar"} />
+                      <AvatarFallback>{profile?.name?.slice(0, 2).toUpperCase() ?? "??"}</AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-electric-500 text-xs font-bold text-white">
+                      {profile?.name?.slice(0, 2).toUpperCase() ?? "??"}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-white">{profile?.name ?? "…"}</div>
                     <div className="truncate text-[11px] text-white/40">{account?.email ?? ""}</div>

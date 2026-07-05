@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       where: { id: profile.id },
       data: {
         name: backup.profile.name,
+        avatarUrl: backup.profile.avatarUrl ?? null,
         exam: backup.profile.exam,
         targetDate: new Date(backup.profile.targetDate),
         studyHoursPerDay: backup.profile.studyHoursPerDay ?? 4,

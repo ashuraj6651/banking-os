@@ -2,12 +2,23 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Timer, Flag, ChevronLeft, ChevronRight, CheckCircle2, Play, Trophy, X, Bookmark, Loader2, Pause, RotateCcw } from "lucide-react";
+import { Timer, Flag, ChevronLeft, ChevronRight, CheckCircle2, Play, Trophy, X, Bookmark, Loader2, Pause, RotateCcw, Trash2 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
-import { useQuestions, useStartMock, useCompleteMock, useSubmitAttempt, useMocks } from "@/lib/hooks";
+import { useQuestions, useStartMock, useCompleteMock, useSubmitAttempt, useMocks, useClearMocks } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 type Status = "launcher" | "live" | "paused" | "result";
 
@@ -61,6 +72,7 @@ export function MockTest() {
   const { data: qData, isLoading } = useQuestions(undefined, undefined);
   const startMock = useStartMock();
   const completeMock = useCompleteMock();
+  const clearMocks = useClearMocks();
   const submitAttempt = useSubmitAttempt();
   const { data: mocksData } = useMocks();
 
@@ -393,7 +405,45 @@ export function MockTest() {
 
       {mocks.length > 0 && (
         <div>
-          <h3 className="mb-3 text-sm font-semibold text-white">History</h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-white">History</h3>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  disabled={clearMocks.isLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 transition-colors hover:bg-white/10 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clear history
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="border-white/10 bg-[#0b1120]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">Clear mock history?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-white/50">
+                    This will permanently remove your mock test history and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white">
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-500 text-white hover:bg-red-400"
+                    onClick={async () => {
+                      try {
+                        await clearMocks.mutateAsync();
+                        toast.success("Mock history cleared");
+                      } catch {
+                        toast.error("Could not clear mock history");
+                      }
+                    }}
+                  >
+                    Clear history
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
           <div className="space-y-3">
             {mocks.map((m) => (
               <GlassCard key={m.id} hover={false}>

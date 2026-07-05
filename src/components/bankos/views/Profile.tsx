@@ -8,6 +8,7 @@ import { GlassCard } from "../GlassCard";
 import { Ring } from "../Ring";
 import { Counter } from "../Counter";
 import { useProfileStats } from "@/lib/hooks";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -85,9 +86,18 @@ export function Profile() {
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center">
           <div className="relative">
-            <div className="grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 via-electric-500 to-cyan-400 text-3xl font-bold text-white shadow-[0_8px_30px_-8px_rgba(139,92,246,0.7)]">
-              {profile.name.slice(0, 2).toUpperCase()}
-            </div>
+            {profile.avatarUrl ? (
+              <Avatar className="h-24 w-24 rounded-3xl shadow-[0_8px_30px_-8px_rgba(139,92,246,0.7)]">
+                <AvatarImage src={profile.avatarUrl} alt={profile.name} />
+                <AvatarFallback className="text-3xl font-bold text-white">
+                  {profile.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 via-electric-500 to-cyan-400 text-3xl font-bold text-white shadow-[0_8px_30px_-8px_rgba(139,92,246,0.7)]">
+                {profile.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="absolute -bottom-2 -right-2 rounded-full border-2 border-[#0b1120] bg-gradient-to-br from-amber-400 to-orange-500 px-2 py-0.5 text-[11px] font-bold text-white">
               LVL {profile.level}
             </div>
