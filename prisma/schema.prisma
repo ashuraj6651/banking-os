@@ -1,0 +1,175 @@
+// BankOS — real persistence schema
+// Multi-account OS with cloud-style backup. All progress is computed from real attempts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  sessions    Session[]
+  profile     Profile?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Profile {
+  id               String   @id @default(cuid())
+  accountId        String?  @unique
+  account          Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name             String
+  exam             String
+  targetDate       DateTime
+  studyHoursPerDay Int      @default(4)
+  weakSubjects     String   @default("")
+  streak           Int      @default(0)
+  lastActiveDate   DateTime?
+  level            Int      @default(1)
+  xp               Int      @default(0)
+  coins            Int      @default(0)
+  roadmap          String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  missions     Mission[]
+  attempts     Attempt[]
+  sessions     StudySession[]
+  mocks        MockTest[]
+  errors       ErrorEntry[]
+  revisions    RevisionItem[]
+  achievements Achievement[]
+  syllabus     SyllabusProgress[]
+}
+
+model SyllabusProgress {
+  id         String    @id @default(cuid())
+  subject    String
+  topic      String
+  checked    Boolean   @default(false)
+  checkedAt  DateTime?
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, subject, topic])
+}
+
+model Mission {
+  id        String   @id @default(cuid())
+  date      DateTime
+  title     String
+  type      String
+  duration  Int
+  done      Boolean  @default(false)
+  order     Int      @default(0)
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, date, title])
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  subject     String
+  topic       String
+  difficulty  String
+  text        String
+  options     String
+  answer      Int
+  explanation String
+  createdAt   DateTime @default(now())
+
+  attempts Attempt[]
+  errors   ErrorEntry[]
+}
+
+model Attempt {
+  id           String   @id @default(cuid())
+  questionId   String
+  question     Question @relation(fields: [questionId], references: [id])
+  selected     Int?
+  correct      Boolean
+  timeTakenSec Int      @default(0)
+  context      String   @default("practice")
+  date         DateTime @default(now())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model StudySession {
+  id                 String   @id @default(cuid())
+  startedAt          DateTime @default(now())
+  durationSec        Int      @default(0)
+  questionsAttempted Int      @default(0)
+  correctCount       Int      @default(0)
+  profileId          String
+  profile            Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model MockTest {
+  id          String   @id @default(cuid())
+  title       String
+  startedAt   DateTime @default(now())
+  durationSec Int
+  status      String   @default("incomplete")
+  score       Int?
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model ErrorEntry {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  reason     String
+  date       DateTime @default(now())
+  reviewed   Boolean  @default(false)
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model RevisionItem {
+  id         String    @id @default(cuid())
+  topic      String
+  subject    String
+  dueDate    DateTime
+  interval   Int       @default(1)
+  strength   Int       @default(0)
+  lastReview DateTime?
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model CurrentAffair {
+  id      String   @id @default(cuid())
+  tag     String
+  title   String
+  summary String
+  date    DateTime @default(now())
+}
+
+model Achievement {
+  id         String   @id @default(cuid())
+  key        String
+  unlockedAt DateTime @default(now())
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, key])
+}

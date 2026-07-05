@@ -1,0 +1,893 @@
+     1→// ============================================================
+     2→// BankOS — Complete Banking Exam Syllabus
+     3→// Every topic across every section. Nothing skipped.
+     4→// Used to power the Syllabus checklist view.
+     5→// ============================================================
+     6→
+     7→export type SyllabusGroup = {
+     8→  name: string;
+     9→  topics: string[];
+    10→};
+    11→
+    12→export type SyllabusSubject = {
+    13→  subject: string;
+    14→  icon: string; // lucide icon name
+    15→  color: string;
+    16→  groups: SyllabusGroup[];
+    17→};
+    18→
+    19→export const SYLLABUS: SyllabusSubject[] = [
+    20→  // ===================== REASONING ABILITY =====================
+    21→  {
+    22→    subject: "Reasoning Ability",
+    23→    icon: "Brain",
+    24→    color: "#8b5cf6",
+    25→    groups: [
+    26→      {
+    27→        name: "Puzzles & Seating Arrangement",
+    28→        topics: [
+    29→          "Linear Seating Arrangement (Single Row)",
+    30→          "Linear Seating Arrangement (Dual Row)",
+    31→          "Circular Seating Arrangement (Facing Centre)",
+    32→          "Circular Seating Arrangement (Facing Outside)",
+    33→          "Circular Seating Arrangement (Mixed Directions)",
+    34→          "Square / Rectangular Seating Arrangement",
+    35→          "Polygon Seating Arrangement",
+    36→          "Floor-based Puzzle",
+    37→          "Floor & Flat Puzzle",
+    38→          "Box Puzzle",
+    39→          "Shelf / Stack Puzzle",
+    40→          "Scheduling Puzzle (Day / Month / Year)",
+    41→          "Date of Birth Puzzle",
+    42→          "Blood Relation Puzzle",
+    43→          "Comparison / Ranking Puzzle",
+    44→          "Designation / Salary Puzzle",
+    45→          "Variable Puzzles (5–8 variables)",
+    46→        ],
+    47→      },
+    48→      {
+    49→        name: "Syllogism",
+    50→        topics: [
+    51→          "Definite Syllogism (Old Pattern)",
+    52→          "Possibility Syllogism",
+    53→          "Coded Syllogism",
+    54→          "Reverse Syllogism",
+    55→          "Only a Few Syllogism",
+    56→          "Syllogism with Negative Conclusions",
+    57→        ],
+    58→      },
+    59→      {
+    60→        name: "Inequality",
+    61→        topics: [
+    62→          "Direct Inequality",
+    63→          "Coded Inequality",
+    64→          "Filling Blanks Inequality",
+    65→        ],
+    66→      },
+    67→      {
+    68→        name: "Coding-Decoding",
+    69→        topics: [
+    70→          "Letter Coding",
+    71→          "Number Coding",
+    72→          "Substitution Coding",
+    73→          "Mixed Coding",
+    74→          "New Pattern Coding (Word/Number with conditions)",
+    75→          "Chinese Coding",
+    76→          "Sentence Coding",
+    77→        ],
+    78→      },
+    79→      {
+    80→        name: "Series",
+    81→        topics: [
+    82→          "Number Series (Reasoning)",
+    83→          "Alphabet Series",
+    84→          "Alphanumeric Series",
+    85→          "Alphanumeric Symbol Series",
+    86→          "Mixed Series",
+    87→        ],
+    88→      },
+    89→      {
+    90→        name: "Direction & Distance",
+    91→        topics: [
+    92→          "Basic Direction Sense",
+    93→          "Direction with Distance",
+    94→          "Shadow-based Direction",
+    95→          "Coded Direction",
+    96→        ],
+    97→      },
+    98→      {
+    99→        name: "Blood Relations",
+   100→        topics: [
+   101→          "Family Tree / Generation Puzzle",
+   102→          "Coded Blood Relations",
+   103→          "Blood Relations with Direction",
+   104→          "Pointing / Introducing Type",
+   105→        ],
+   106→      },
+   107→      {
+   108→        name: "Order & Ranking",
+   109→        topics: [
+   110→          "Ranking in a Line",
+   111→          "Position from Both Ends",
+   112→          "Comparison Ranking",
+   113→          "Person Comparison Puzzles",
+   114→        ],
+   115→      },
+   116→      {
+   117→        name: "Machine Input-Output",
+   118→        topics: [
+   119→          "Word & Number Shifting",
+   120→          "Letter Shifting",
+   121→          "Mathematical Operation Based",
+   122→          "New Pattern Input-Output",
+   123→        ],
+   124→      },
+   125→      {
+   126→        name: "Data Sufficiency",
+   127→        topics: [
+   128→          "Two-statement Data Sufficiency",
+   129→          "Three-statement Data Sufficiency",
+   130→          "Reasoning Based Data Sufficiency",
+   131→        ],
+   132→      },
+   133→      {
+   134→        name: "Verbal / Logical Reasoning",
+   135→        topics: [
+   136→          "Statement & Assumption",
+   137→          "Statement & Conclusion",
+   138→          "Statement & Argument",
+   139→          "Statement & Course of Action",
+   140→          "Cause & Effect",
+   141→          "Inference",
+   142→          "Strong & Weak Arguments",
+   143→          "Decision Making",
+   144→          "Deriving Conclusions from Passages",
+   145→        ],
+   146→      },
+   147→      {
+   148→        name: "Miscellaneous",
+   149→        topics: [
+   150→          "Odd One Out",
+   151→          "Analogy",
+   152→          "Classification",
+   153→          "Mirror Image & Water Image",
+   154→          "Paper Folding & Cutting",
+   155→          "Embedded Figures",
+   156→          "Cube & Dice",
+   157→        ],
+   158→      },
+   159→    ],
+   160→  },
+   161→
+   162→  // ===================== QUANTITATIVE APTITUDE =====================
+   163→  {
+   164→    subject: "Quantitative Aptitude",
+   165→    icon: "Sigma",
+   166→    color: "#3b82f6",
+   167→    groups: [
+   168→      {
+   169→        name: "Simplification & Approximation",
+   170→        topics: [
+   171→          "Simplification (BODMAS)",
+   172→          "Approximation",
+   173→          "Number System Basics",
+   174→          "HCF & LCM",
+   175→          "Squares, Cubes, Square Roots & Cube Roots",
+   176→          "Surds & Indices",
+   177→        ],
+   178→      },
+   179→      {
+   180→        name: "Number Series",
+   181→        topics: [
+   182→          "Missing Number Series",
+   183→          "Wrong Number Series",
+   184→          "Wrong Term Series",
+   185→          "Double Pattern Series",
+   186→        ],
+   187→      },
+   188→      {
+   189→        name: "Quadratic Equations",
+   190→        topics: [
+   191→          "Quadratic Equations",
+   192→          "Quadratic Inequalities",
+   193→          "Quantity Comparison (Quadratic)",
+   194→        ],
+   195→      },
+   196→      {
+   197→        name: "Data Interpretation",
+   198→        topics: [
+   199→          "Tabular Data Interpretation",
+   200→          "Bar Graph DI",
+   201→          "Line Graph DI",
+   202→          "Pie Chart DI (Single)",
+   203→          "Pie Chart DI (Multiple)",
+   204→          "Mixed / Combination DI",
+   205→          "Caselet DI",
+   206→          "Radar / Web DI",
+   207→          "Missing Data DI",
+   208→          "Arithmetic-based DI",
+   209→          "Time & Work DI",
+   210→          "Probability-based DI",
+   211→        ],
+   212→      },
+   213→      {
+   214→        name: "Data Sufficiency",
+   215→        topics: [
+   216→          "Two-statement Data Sufficiency",
+   217→          "Three-statement Data Sufficiency",
+   218→        ],
+   219→      },
+   220→      {
+   221→        name: "Quantity Comparison",
+   222→        topics: [
+   223→          "Quantity I vs Quantity II",
+   224→          "Quantity Comparison with Arithmetic",
+   225→        ],
+   226→      },
+   227→      {
+   228→        name: "Arithmetic",
+   229→        topics: [
+   230→          "Ratio & Proportion",
+   231→          "Proportion & Variations",
+   232→          "Percentage",
+   233→          "Average",
+   234→          "Profit, Loss & Discount",
+   235→          "Successive Selling",
+   236→          "Dishonest Dealer / Faulty Weight",
+   237→          "Partnership",
+   238→          "Mixture & Alligation",
+   239→          "Problem on Ages",
+   240→          "Simple Interest",
+   241→          "Compound Interest",
+   242→          "Time & Work",
+   243→          "Pipe & Cistern",
+   244→          "Work & Wages",
+   245→          "Alternate Day Work",
+   246→          "Efficiency-based Work",
+   247→          "Time, Speed & Distance",
+   248→          "Average Speed",
+   249→          "Relative Speed",
+   250→          "Trains",
+   251→          "Boats & Streams",
+   252→          "Races & Games",
+   253→          "Speed in still water / downstream / upstream",
+   254→          "Permutation & Combination",
+   255→          "Probability",
+   256→          "Mensuration 2D (Triangle, Rectangle, Square, Circle, Parallelogram, Rhombus, Trapezium)",
+   257→          "Mensuration 3D (Cube, Cuboid, Cylinder, Cone, Sphere, Hemisphere, Frustum)",
+   258→          "Calendar",
+   259→          "Clocks & Angles",
+   260→          "Income & Expenditure",
+   261→          "Expenditure & Saving",
+   262→        ],
+   263→      },
+   264→      {
+   265→        name: "Advanced / Misc",
+   266→        topics: [
+   267→          "Number System Divisibility",
+   268→          "Remainder Theorem",
+   269→          "Unit Digit",
+   270→          "Last Two Digits",
+   271→          "Number of Factors / Sum of Factors",
+   272→          "Concept of Total / Zero / Negative marks",
+   273→        ],
+   274→      },
+   275→    ],
+   276→  },
+   277→
+   278→  // ===================== ENGLISH LANGUAGE =====================
+   279→  {
+   280→    subject: "English Language",
+   281→    icon: "BookOpen",
+   282→    color: "#22d3ee",
+   283→    groups: [
+   284→      {
+   285→        name: "Reading Comprehension",
+   286→        topics: [
+   287→          "Theme / Main Idea based RC",
+   288→          "Inference based RC",
+   289→          "Fact based RC",
+   290→          "Vocabulary based RC",
+   291→          "Economy / Banking based RC",
+   292→          "Business / Finance based RC",
+   293→          "Social Issue based RC",
+   294→          "Technology based RC",
+   295→          "History / Philosophy based RC",
+   296→          "RC with Synonym / Antonym questions",
+   297→          "RC with Title / Tone questions",
+   298→        ],
+   299→      },
+   300→      {
+   301→        name: "Cloze Test",
+   302→        topics: [
+   303→          "Old Pattern Cloze Test",
+   304→          "New Pattern Cloze Test (Word Replacement)",
+   305→          "Cloze Test with Phrasal Verbs",
+   306→          "Cloze Test with Fill in the Blanks",
+   307→        ],
+   308→      },
+   309→      {
+   310→        name: "Fill in the Blanks",
+   311→        topics: [
+   312→          "Single Fill in the Blank",
+   313→          "Double Fill in the Blank",
+   314→          "Triple Fill in the Blank",
+   315→          "Fill in the Blanks with Phrasal Verbs",
+   316→        ],
+   317→      },
+   318→      {
+   319→        name: "Spotting Errors",
+   320→        topics: [
+   321→          "Spotting Errors (Grammar)",
+   322→          "Spelling Error Spotting",
+   323→          "Error in Underlined Part",
+   324→          "Find the Correct Sentence",
+   325→        ],
+   326→      },
+   327→      {
+   328→        name: "Sentence Improvement & Correction",
+   329→        topics: [
+   330→          "Sentence Improvement",
+   331→          "Sentence Correction",
+   332→          "Phrase Replacement",
+   333→          "Phrase Correction",
+   334→          "Choose the Correct Alternative",
+   335→        ],
+   336→      },
+   337→      {
+   338→        name: "Sentence Rearrangement",
+   339→        topics: [
+   340→          "Para Jumbles (Old Pattern)",
+   341→          "Para Jumbles (New Pattern - First Sentence Fixed)",
+   342→          "Para Jumbles with Options",
+   343→          "Odd Sentence Out (Para Jumble)",
+   344→        ],
+   345→      },
+   346→      {
+   347→        name: "Para Based",
+   348→        topics: [
+   349→          "Para Completion",
+   350→          "Para Summary",
+   351→          "Para Connectors",
+   352→          "Sentence Connectors",
+   353→          "Paragraph Connectors",
+   354→        ],
+   355→      },
+   356→      {
+   357→        name: "Word Level",
+   358→        topics: [
+   359→          "Synonyms",
+   360→          "Antonyms",
+   361→          "Word Swap (in sentence)",
+   362→          "Word Usage (Correct Usage)",
+   363→          "Word Replacement",
+   364→          "Idioms & Phrases (Meaning)",
+   365→          "Idioms & Phrases (Usage in Sentence)",
+   366→          "One Word Substitution",
+   367→          "Spelling Correction",
+   368→        ],
+   369→      },
+   370→      {
+   371→        name: "Grammar",
+   372→        topics: [
+   373→          "Active / Passive Voice",
+   374→          "Direct / Indirect Speech",
+   375→          "Tenses",
+   376→          "Subject-Verb Agreement",
+   377→          "Articles",
+   378→          "Prepositions",
+   379→          "Conjunctions",
+   380→          "Conditionals",
+   381→          "Parts of Speech",
+   382→        ],
+   383→      },
+   384→      {
+   385→        name: "New Pattern",
+   386→        topics: [
+   387→          "Match the Column",
+   388→          "Column Based Sentence Correction",
+   389→          "Sentence Starters",
+   390→          "Sentence Completion with Multiple Options",
+   391→          "Word Association",
+   392→          "Vocabulary Based Fillers",
+   393→        ],
+   394→      },
+   395→    ],
+   396→  },
+   397→
+   398→  // ===================== COMPUTER AWARENESS =====================
+   399→  {
+   400→    subject: "Computer Awareness",
+   401→    icon: "Cpu",
+   402→    color: "#ec4899",
+   403→    groups: [
+   404→      {
+   405→        name: "Computer Fundamentals",
+   406→        topics: [
+   407→          "History of Computers",
+   408→          "Generations of Computers",
+   409→          "Types of Computers",
+   410→          "Computer Architecture (Input/Output/Storage)",
+   411→          "Computer Hardware Components",
+   412→          "Computer Software (System & Application)",
+   413→          "Boot Process",
+   414→        ],
+   415→      },
+   416→      {
+   417→        name: "Operating Systems",
+   418→        topics: [
+   419→          "OS Fundamentals",
+   420→          "Types of OS",
+   421→          "Functions of OS",
+   422→          "File Management",
+   423→          "Process Management",
+   424→        ],
+   425→      },
+   426→      {
+   427→        name: "MS Office",
+   428→        topics: [
+   429→          "MS Word",
+   430→          "MS Excel (Formulas, Functions, Charts)",
+   431→          "MS PowerPoint",
+   432→          "MS Access",
+   433→        ],
+   434→      },
+   435→      {
+   436→        name: "Internet & Networking",
+   437→        topics: [
+   438→          "Internet Basics & History",
+   439→          "Web Browsers",
+   440→          "Search Engines",
+   441→          "Email & Protocols (SMTP, POP, IMAP)",
+   442→          "URL, HTTP, HTTPS, FTP",
+   443→          "Networking Fundamentals (LAN, WAN, MAN)",
+   444→          "Network Topologies",
+   445→          "IP Addressing (IPv4, IPv6)",
+   446→          "Wireless Communication (Wi-Fi, Bluetooth)",
+   447→        ],
+   448→      },
+   449→      {
+   450→        name: "Data & Security",
+   451→        topics: [
+   452→          "Database Management Systems (DBMS)",
+   453→          "Data Warehouse & Data Mining",
+   454→          "Cloud Computing (IaaS, PaaS, SaaS)",
+   455→          "Computer Security",
+   456→          "Viruses, Worms, Trojans",
+   457→          "Malware & Spyware",
+   458→          "Antivirus & Firewalls",
+   459→          "Cryptography (Symmetric & Asymmetric)",
+   460→          "Digital Signatures",
+   461→          "Two-Factor Authentication",
+   462→        ],
+   463→      },
+   464→      {
+   465→        name: "Modern Technology",
+   466→        topics: [
+   467→          "Artificial Intelligence",
+   468→          "Machine Learning",
+   469→          "Internet of Things (IoT)",
+   470→          "Blockchain",
+   471→          "Big Data",
+   472→          "Data Science",
+   473→          "5G Technology",
+   474→          "Quantum Computing",
+   475→        ],
+   476→      },
+   477→      {
+   478→        name: "Memory & Storage",
+   479→        topics: [
+   480→          "Primary Memory (RAM, ROM, Cache)",
+   481→          "Secondary Memory (HDD, SSD, Pen Drive)",
+   482→          "Memory Units (Bit, Byte, KB, MB, GB, TB)",
+   483→          "Registers",
+   484→        ],
+   485→      },
+   486→      {
+   487→        name: "Miscellaneous",
+   488→        topics: [
+   489→          "Computer Abbreviations",
+   490→          "Shortcut Keys",
+   491→          "Programming Languages (Basics)",
+   492→          "E-Governance Initiatives",
+   493→          "Digital India",
+   494→        ],
+   495→      },
+   496→    ],
+   497→  },
+   498→
+   499→  // ===================== BANKING & FINANCIAL AWARENESS =====================
+   500→  {
+   501→    subject: "Banking & Financial Awareness",
+   502→    icon: "Landmark",
+   503→    color: "#f59e0b",
+   504→    groups: [
+   505→      {
+   506→        name: "Indian Banking System",
+   507→        topics: [
+   508→          "History of Banking in India",
+   509→          "Nationalisation of Banks (1969 & 1980)",
+   510→          "Structure of Indian Banking",
+   511→          "RBI (Reserve Bank of India)",
+   512→          "Functions of RBI",
+   513→          "RBI Acts & Framework",
+   514→          "NABARD",
+   515→          "SIDBI",
+   516→          "EXIM Bank",
+   517→          "SEBI",
+   518→          "IRDAI",
+   519→          "PFRDA",
+   520→          "Small Finance Banks",
+   521→          "Payments Banks",
+   522→          "Cooperative Banks",
+   523→          "Regional Rural Banks (RRBs)",
+   524→          "Local Area Banks",
+   525→        ],
+   526→      },
+   527→      {
+   528→        name: "Monetary Policy",
+   529→        topics: [
+   530→          "Repo Rate",
+   531→          "Reverse Repo Rate",
+   532→          "Cash Reserve Ratio (CRR)",
+   533→          "Statutory Liquidity Ratio (SLR)",
+   534→          "Marginal Standing Facility (MSF)",
+   535→          "Bank Rate",
+   536→          "Open Market Operations (OMO)",
+   537→          "Inflation (CPI, WPI)",
+   538→          "Deflation & Disinflation",
+   539→          "Monetary Policy Committee (MPC)",
+   540→          "Quantitative & Qualitative Tools",
+   541→        ],
+   542→      },
+   543→      {
+   544→        name: "Banking Products & Services",
+   545→        topics: [
+   546→          "Types of Accounts (Savings, Current, Fixed, Recurring)",
+   547→          "Interest Rates on Deposits",
+   548→          "Cheques & Types of Cheques",
+   549→          "Demand Draft (DD)",
+   550→          "Banker's Cheque",
+   551→          "Pay Order",
+   552→          "Traveller's Cheque",
+   553→          "Negotiable Instruments (Act 1881)",
+   554→          "Bill of Exchange",
+   555→          "Promissory Note",
+   556→          "Kisan Credit Card (KCC)",
+   557→          "Credit Cards, Debit Cards, Prepaid Cards",
+   558→          "ATM & Types of ATMs",
+   559→          "Lockers & Safe Deposit",
+   560→        ],
+   561→      },
+   562→      {
+   563→        name: "Digital Banking",
+   564→        topics: [
+   565→          "Unified Payments Interface (UPI)",
+   566→          "IMPS (Immediate Payment Service)",
+   567→          "NEFT (National Electronic Funds Transfer)",
+   568→          "RTGS (Real Time Gross Settlement)",
+   569→          "AEPS (Aadhaar Enabled Payment System)",
+   570→          "BBPS (Bharat Bill Payment System)",
+   571→          "NACH (National Automated Clearing House)",
+   572→          "ECS (Electronic Clearing Service)",
+   573→          "Mobile Banking",
+   574→          "Internet Banking",
+   575→          "Wallets (Paytm, PhonePe, etc.)",
+   576→          "BharatQR",
+   577→          "Contactless Payments (NFC)",
+   578→          "Digital Rupee (CBDC)",
+   579→        ],
+   580→      },
+   581→      {
+   582→        name: "Financial Inclusion & Schemes",
+   583→        topics: [
+   584→          "Pradhan Mantri Jan Dhan Yojana (PMJDY)",
+   585→          "JAM Trinity (Jan Dhan, Aadhaar, Mobile)",
+   586→          "Pradhan Mantri Mudra Yojana",
+   587→          "Stand Up India Scheme",
+   588→          "Atal Pension Yojana",
+   589→          "Pradhan Mantri Suraksha Bima Yojana",
+   590→          "Pradhan Mantri Jeevan Jyoti Bima Yojana",
+   591→          "Sukanya Samriddhi Yojana",
+   592→          "Public Provident Fund (PPF)",
+   593→          "National Pension System (NPS)",
+   594→          "Gold Monetisation Scheme",
+   595→          "Sovereign Gold Bond Scheme",
+   596→          "Priority Sector Lending (PSL)",
+   597→          "Lead Bank Scheme",
+   598→          "Business Correspondent Model",
+   599→        ],
+   600→      },
+   601→      {
+   602→        name: "Banking Regulation & Reforms",
+   603→        topics: [
+   604→          "Banking Regulation Act 1949",
+   605→          "Narasimham Committee (I & II)",
+   606→          "Basel Norms (I, II, III)",
+   607→          "NPA (Non-Performing Assets)",
+   608→          "SARFAESI Act",
+   609→          "Insolvency and Bankruptcy Code (IBC)",
+   610→          "Insolvency and Bankruptcy Board of India (IBBI)",
+   611→          "Fugitive Economic Offenders Act",
+   612→          "Recapitalisation of Banks",
+   613→          "Merger of Banks",
+   614→          "Banking Ombudsman Scheme",
+   615→          "KYC (Know Your Customer)",
+   616→          "AML (Anti-Money Laundering)",
+   617→          "PMLA (Prevention of Money Laundering Act)",
+   618→        ],
+   619→      },
+   620→      {
+   621→        name: "Financial Markets",
+   622→        topics: [
+   623→          "Money Market Instruments (T-Bills, Commercial Paper, Certificate of Deposit)",
+   624→          "Capital Market (Primary & Secondary)",
+   625→          "Shares & Bonds",
+   626→          "Debentures",
+   627→          "Mutual Funds (Types)",
+   628→          "SIP (Systematic Investment Plan)",
+   629→          "Derivatives (Forwards, Futures, Options)",
+   630→          "Foreign Exchange Market (FOREX)",
+   631→          "Stock Exchanges (BSE, NSE)",
+   632→          "Indices (Sensex, Nifty)",
+   633→          "SEBI Regulations",
+   634→        ],
+   635→      },
+   636→      {
+   637→        name: "Insurance",
+   638→        topics: [
+   639→          "Life Insurance Corporation (LIC)",
+   640→          "General Insurance Corporation (GIC)",
+   641→          "Types of Life Insurance",
+   642→          "Types of General Insurance",
+   643→          "Insurance Ombudsman",
+   644→          "Pradhan Mantri Fasal Bima Yojana",
+   645→          "Pradhan Mantri Jan Arogya Yojana (Ayushman Bharat)",
+   646→        ],
+   647→      },
+   648→      {
+   649→        name: "Important Committees & Reports",
+   650→        topics: [
+   651→          "Narasimham Committee",
+   652→          "Kelkar Committee",
+   653→          "Urjit Patel Committee",
+   654→          "Bimal Jalan Committee",
+   655→          "P.J. Nayak Committee",
+   656→          "Nachiket Mor Committee",
+   657→          "Economic Survey Highlights",
+   658→          "Union Budget Highlights",
+   659→        ],
+   660→      },
+   661→    ],
+   662→  },
+   663→
+   664→  // ===================== CURRENT AFFAIRS =====================
+   665→  {
+   666→    subject: "Current Affairs",
+   667→    icon: "Newspaper",
+   668→    color: "#10b981",
+   669→    groups: [
+   670→      {
+   671→        name: "National Affairs",
+   672→        topics: [
+   673→          "Government Policies & Schemes",
+   674→          "Cabinet Approvals & Decisions",
+   675→          "State-level Schemes & News",
+   676→          "Constitutional Amendments",
+   677→          "Parliament Bills & Acts",
+   678→          "Supreme Court Judgements",
+   679→          "Election Commission News",
+   680→        ],
+   681→      },
+   682→      {
+   683→        name: "Banking & Economy",
+   684→        topics: [
+   685→          "RBI Announcements",
+   686→          "Repo / Reverse Repo Changes",
+   687→          "Bank Mergers & Acquisitions",
+   688→          "New Bank Licenses",
+   689→          "Financial Results of Banks",
+   690→          "Credit / Debit Card Trends",
+   691→          "Digital Payment Statistics",
+   692→          "FDI / FII Data",
+   693→          "GDP Growth Rate",
+   694→          "Inflation Data",
+   695→          "Repo & Monetary Policy Reviews",
+   696→        ],
+   697→      },
+   698→      {
+   699→        name: "International Affairs",
+   700→        topics: [
+   701→          "World Leaders & Summits (G20, BRICS, ASEAN)",
+   702→          "Bilateral Agreements",
+   703→          "MoUs with Other Countries",
+   704→          "International Organisations (IMF, World Bank, WTO, UN)",
+   705→          "Global Indices & India's Rank",
+   706→          "Wars & Conflicts",
+   707→        ],
+   708→      },
+   709→      {
+   710→        name: "Awards & Honours",
+   711→        topics: [
+   712→          "Nobel Prize",
+   713→          "Bharat Ratna, Padma Awards",
+   714→          "National Sports Awards (Khel Ratna, Arjuna)",
+   715→          "National Film Awards",
+   716→          "Pulitzer Prize",
+   717→          "Oscar Awards",
+   718→          "Booker Prize",
+   719→          "Sahitya Akademi Award",
+   720→        ],
+   721→      },
+   722→      {
+   723→        name: "Sports",
+   724→        topics: [
+   725→          "Cricket Tournaments (IPL, World Cup, Asia Cup)",
+   726→          "Olympic Games",
+   727→          "Commonwealth Games",
+   728→          "Asian Games",
+   729→          "Football Tournaments",
+   730→          "Tennis Grand Slams",
+   731→          "Badminton Tournaments",
+   732→          "Hockey Tournaments",
+   733→          "Indian Athletes Achievements",
+   734→        ],
+   735→      },
+   736→      {
+   737→        name: "Science & Technology",
+   738→        topics: [
+   739→          "ISRO Missions (Chandrayaan, Mangalyaan, Gaganyaan)",
+   740→          "NASA & Space News",
+   741→          "New Inventions & Discoveries",
+   742→          "AI & Tech Developments",
+   743→          "Health & Medicine",
+   744→          "Vaccines & Diseases",
+   745→          "Defence Technology",
+   746→        ],
+   747→      },
+   748→      {
+   749→        name: "Defence & Security",
+   750→        topics: [
+   751→          "Defence Exercises (Indian & Joint)",
+   752→          "New Defence Equipment",
+   753→          "DRDO Developments",
+   754→          "Military Ranks & Appointments",
+   755→          "Border Security News",
+   756→        ],
+   757→      },
+   758→      {
+   759→        name: "Summits & Conferences",
+   760→        topics: [
+   761→          "G20 Summit",
+   762→          "BRICS Summit",
+   763→          "ASEAN Summit",
+   764→          "SAARC Summit",
+   765→          "BIMSTEC Summit",
+   766→          "COP (Climate) Summit",
+   767→          "World Economic Forum (Davos)",
+   768→        ],
+   769→      },
+   770→      {
+   771→        name: "Appointments & Resignations",
+   772→        topics: [
+   773→          "National Appointments (President, PM, Ministers, Judges)",
+   774→          "RBI Governor & Deputy Governors",
+   775→          "Heads of Banks & PSUs",
+   776→          "International Appointments",
+   777→          "Chief Ministers & Governors",
+   778→        ],
+   779→      },
+   780→      {
+   781→        name: "Books & Authors",
+   782→        topics: [
+   783→          "New Book Releases",
+   784→          "Books by Famous Personalities",
+   785→          "Books on Banking & Economy",
+   786→        ],
+   787→      },
+   788→      {
+   789→        name: "Obituaries",
+   790→        topics: [
+   791→          "National Obituaries",
+   792→          "International Obituaries",
+   793→          "Famous Personalities",
+   794→        ],
+   795→      },
+   796→      {
+   797→        name: "Important Days",
+   798→        topics: [
+   799→          "National Days",
+   800→          "International Days (UN)",
+   801→          "Theme-based Days",
+   802→        ],
+   803→      },
+   804→      {
+   805→        name: "Static GK (Mains/Interview)",
+   806→        topics: [
+   807→          "Indian Constitution (Parts, Schedules, Articles)",
+   808→          "Fundamental Rights & Duties",
+   809→          "Indian History (Ancient, Medieval, Modern)",
+   810→          "Indian Geography (Rivers, Mountains, States)",
+   811→          "World Geography",
+   812→          "Indian Polity",
+   813→          "Census 2011 Highlights",
+   814→          "First in India (Men & Women)",
+   815→          "First in World",
+   816→          "Dances of India",
+   817→          "Festivals of India",
+   818→          "Rivers & Dams in India",
+   819→          "National Parks & Wildlife Sanctuaries",
+   820→        ],
+   821→      },
+   822→    ],
+   823→  },
+   824→
+   825→  // ===================== INTERVIEW PREPARATION =====================
+   826→  {
+   827→    subject: "Interview Preparation",
+   828→    icon: "Building2",
+   829→    color: "#a855f7",
+   830→    groups: [
+   831→      {
+   832→        name: "Personal Profile",
+   833→        topics: [
+   834→          "Tell Me About Yourself",
+   835→          "Strengths & Weaknesses",
+   836→          "Why Banking Career",
+   837→          "Why This Bank",
+   838→          "Background (Education, Hometown)",
+   839→          "Hobbies & Interests",
+   840→          "Family Background",
+   841→        ],
+   842→      },
+   843→      {
+   844→        name: "Banking Awareness (Interview)",
+   845→        topics: [
+   846→          "Latest Banking Developments",
+   847→          "Functions of Your Preferred Bank",
+   848→          "Difference Between Banks",
+   849→          "Recent Banking Schemes",
+   850→          "Your Views on Banking Sector",
+   851→        ],
+   852→      },
+   853→      {
+   854→        name: "Current Affairs (Interview)",
+   855→        topics: [
+   856→          "Last 6 Months Current Affairs",
+   857→          "Latest Economic News",
+   858→          "Latest Government Policies",
+   859→          "Your Opinion on Burning Issues",
+   860→        ],
+   861→      },
+   862→      {
+   863→        name: "HR Questions",
+   864→        topics: [
+   865→          "Where Do You See Yourself in 5 Years",
+   866→          "Why Should We Hire You",
+   867→          "Salary Expectations",
+   868→          "Relocation Willingness",
+   869→          "Handling Pressure",
+   870→          "Teamwork Scenarios",
+   871→          "Leadership Examples",
+   872→        ],
+   873→      },
+   874→      {
+   875→        name: "Situational / Case Questions",
+   876→        topics: [
+   877→          "Ethical Dilemmas",
+   878→          "Customer Handling Scenarios",
+   879→          "Conflict Resolution",
+   880→          "Decision Making Under Stress",
+   881→        ],
+   882→      },
+   883→    ],
+   884→  },
+   885→];
+   886→
+   887→/** Flatten all topics for quick lookup / total count. */
+   888→export const ALL_TOPICS: { subject: string; topic: string }[] = SYLLABUS.flatMap(
+   889→  (s) => s.groups.flatMap((g) => g.topics.map((t) => ({ subject: s.subject, topic: t })))
+   890→);
+   891→
+   892→export const TOTAL_TOPICS = ALL_TOPICS.length;
+   893→
