@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "@/lib/groq";
 import { db } from "@/lib/db";
 import { getProfile } from "@/lib/metrics";
 
@@ -37,13 +37,9 @@ async function generateQuestionsWithAI(
   existingQuestionTexts: string[],
   profileName: string
 ): Promise<{ text: string; options: string[]; answer: number; explanation: string; topic: string }[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.GROQ_API_KEY) {
     return [];
   }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const subjectTopics: Record<string, string> = {
     "Reasoning": "syllogisms, puzzles, coding-decoding, blood relations, direction sense, seating arrangement, inequality, series, analogy, classification",
@@ -78,8 +74,7 @@ Return ONLY valid JSON array with no markdown, no code fences, no explanation ou
 
 Generate the questions now:`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
+  const text = (await generateText(prompt)).trim();
 
   // Clean up response - remove markdown code fences if present
   let cleaned = text;

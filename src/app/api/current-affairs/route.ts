@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "@/lib/groq";
 import { db } from "@/lib/db";
 import { getProfile } from "@/lib/metrics";
 
@@ -37,16 +37,12 @@ export async function GET() {
 // POST /api/current-affairs — refresh & generate new current affairs via AI
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!process.env.GROQ_API_KEY) {
       return NextResponse.json({ error: "AI service not configured" }, { status: 500 });
     }
 
     const profile = await getProfile();
     const userName = profile?.name || "Student";
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
@@ -73,8 +69,7 @@ Return ONLY valid JSON array with no markdown, no code fences. Format:
 
 Generate now:`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
+    let text = (await generateText(prompt)).trim();
     if (text.startsWith("```json")) text = text.slice(7);
     if (text.startsWith("```")) text = text.slice(3);
     if (text.endsWith("```")) text = text.slice(0, -3);
@@ -124,8 +119,7 @@ Return ONLY valid JSON array with no markdown, no code fences. Format:
 
 Generate now:`;
 
-        const qResult = await model.generateContent(qPrompt);
-        let qText = qResult.response.text().trim();
+        let qText = (await generateText(qPrompt)).trim();
         if (qText.startsWith("```json")) qText = qText.slice(7);
         if (qText.startsWith("```")) qText = qText.slice(3);
         if (qText.endsWith("```")) qText = qText.slice(0, -3);

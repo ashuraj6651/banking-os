@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "@/lib/groq";
 import { db } from "@/lib/db";
 import { ensureTodayMissions, touchStreak, getProfile } from "@/lib/metrics";
 import { getAccount } from "@/lib/auth";
@@ -68,17 +68,9 @@ export async function POST(req: NextRequest) {
     let roadmap = "";
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY not found");
+      if (!process.env.GROQ_API_KEY) {
+        throw new Error("GROQ_API_KEY not found");
       }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-      });
 
       const daysLeft = Math.max(
         1,
@@ -110,9 +102,7 @@ Return markdown with these sections:
 Keep the roadmap under 220 words and make it actionable.
 `;
 
-      const result = await model.generateContent(prompt);
-
-      roadmap = result.response.text();
+      roadmap = await generateText(prompt);
     } catch (err) {
       console.error(err);
 

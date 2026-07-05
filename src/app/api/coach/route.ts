@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateChatReply } from "@/lib/groq";
 
 const SYSTEM_PROMPT = `
 You are Mentor, the AI Coach inside BankOS.
@@ -14,38 +14,16 @@ export async function POST(req: NextRequest) {
     console.log("MESSAGES RECEIVED:");
     console.log(messages);
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
+    if (!process.env.GROQ_API_KEY) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY not found" },
+        { error: "GROQ_API_KEY not found" },
         { status: 500 }
       );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const content = await generateChatReply(SYSTEM_PROMPT, messages);
 
-    const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-});
-
-    const prompt = `
-${SYSTEM_PROMPT}
-
-Conversation:
-
-${messages
-  .map((m: any) => `${m.role}: ${m.content}`)
-  .join("\n")}
-
-assistant:
-`;
-
-    const result = await model.generateContent(prompt);
-
-    return NextResponse.json({
-      content: result.response.text(),
-    });
+    return NextResponse.json({ content });
 
   } catch (e) {
     console.error("FULL ERROR:", e);
