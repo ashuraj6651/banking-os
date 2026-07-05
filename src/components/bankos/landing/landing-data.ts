@@ -1,6 +1,6 @@
-import { STATS, TIMELINE, PRINCIPLES, PRICING, FAQS, EXAMS } from "@/lib/data";
+import { STATS, TIMELINE, PRINCIPLES, FAQS, EXAMS } from "@/lib/data";
 
-export { STATS, TIMELINE, PRINCIPLES, PRICING, FAQS, EXAMS };
+export { STATS, TIMELINE, PRINCIPLES, FAQS, EXAMS };
 
 export const FEATURES: {
   title: string;

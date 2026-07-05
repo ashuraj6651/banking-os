@@ -27,7 +27,6 @@ import {
   FEATURES,
   TIMELINE,
   PRINCIPLES,
-  PRICING,
   FAQS,
   EXAMS,
 } from "./landing-data";
@@ -66,7 +65,6 @@ export function Landing() {
           <nav className="hidden items-center gap-7 text-sm text-white/60 md:flex">
             <a href="#features" className="transition-colors hover:text-white">Features</a>
             <a href="#journey" className="transition-colors hover:text-white">Journey</a>
-            <a href="#pricing" className="transition-colors hover:text-white">Pricing</a>
             <a href="#stories" className="transition-colors hover:text-white">Stories</a>
           </nav>
           <div className="flex items-center gap-2">
@@ -320,64 +318,6 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ===== Pricing ===== */}
-      <section id="pricing" className="px-4 py-24 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <SectionHeading
-            eyebrow="Pricing"
-            title="Premium, fairly priced."
-            subtitle="Start free. Upgrade when you're serious. Cancel anytime."
-          />
-          <div className="mt-14 grid gap-6 lg:grid-cols-3">
-            {PRICING.map((p, i) => (
-              <Reveal key={p.name} delay={i * 0.08}>
-                <GlassCard
-                  hover={false}
-                  className={cn(
-                    "relative h-full overflow-hidden",
-                    p.highlighted && "border-violet-400/30 ring-1 ring-violet-400/20"
-                  )}
-                >
-                  {p.highlighted && (
-                    <div className="absolute right-0 top-0 rounded-bl-2xl bg-gradient-to-r from-violet-500 to-electric-500 px-3 py-1 text-[11px] font-semibold text-white">
-                      MOST POPULAR
-                    </div>
-                  )}
-                  <div className="p-7">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white/60">{p.name}</h3>
-                    <div className="mt-4 flex items-end gap-1">
-                      <span className="text-4xl font-bold text-white">{p.price}</span>
-                      <span className="mb-1 text-sm text-white/40">{p.period}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-white/50">{p.desc}</p>
-                    <button
-                      onClick={startAuth}
-                      className={cn(
-                        "mt-6 w-full rounded-xl py-3 text-sm font-semibold transition-all",
-                        p.highlighted
-                          ? "bg-gradient-to-b from-violet-500 to-electric-600 text-white shadow-[0_8px_24px_-8px_rgba(139,92,246,0.6)] hover:shadow-[0_10px_30px_-6px_rgba(139,92,246,0.85)]"
-                          : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-                      )}
-                    >
-                      {p.cta}
-                    </button>
-                    <div className="mt-6 space-y-3">
-                      {p.features.map((f) => (
-                        <div key={f} className="flex items-start gap-2.5 text-sm text-white/70">
-                          <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-violet-500/20">
-                            <Check className="h-2.5 w-2.5 text-violet-300" />
-                          </span>
-                          {f}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </GlassCard>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ===== FAQ ===== */}
       <section className="px-4 py-24 sm:px-6">

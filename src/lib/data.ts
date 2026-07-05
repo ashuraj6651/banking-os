@@ -64,55 +64,6 @@ export const PRINCIPLES = [
   },
 ];
 
-export const PRICING = [
-  {
-    name: "Pilot",
-    price: "Free",
-    period: "forever",
-    desc: "For explorers starting their journey.",
-    features: [
-      "Mission Control dashboard",
-      "1 focus session / day",
-      "Practice question bank",
-      "Basic analytics",
-    ],
-    cta: "Start Free",
-    highlighted: false,
-  },
-  {
-    name: "Operator",
-    price: "₹699",
-    period: "/month",
-    desc: "For serious aspirants chasing selection.",
-    features: [
-      "Unlimited AI Coach & sessions",
-      "Unlimited mock tests",
-      "Adaptive AI study planner",
-      "Readiness & rank prediction",
-      "Error notebook + revision engine",
-      "Advanced analytics",
-    ],
-    cta: "Go Operator",
-    highlighted: true,
-  },
-  {
-    name: "Elite",
-    price: "₹1,499",
-    period: "/month",
-    desc: "For toppers who want every edge.",
-    features: [
-      "Everything in Operator",
-      "Personal AI mentor (1:1 briefings)",
-      "Interview preparation suite",
-      "Custom roadmaps & strategy calls",
-      "Priority performance prediction",
-      "Early access to new modules",
-    ],
-    cta: "Go Elite",
-    highlighted: false,
-  },
-];
-
 export const FAQS = [
   {
     q: "Is BankOS a coaching platform?",
