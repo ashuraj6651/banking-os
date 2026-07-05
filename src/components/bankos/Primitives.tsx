@@ -110,16 +110,14 @@ export function Wordmark({
     <div className={cn("flex items-center gap-2.5 wordmark-glow", className)}>
       <div
         className={cn(
-          "relative grid place-items-center rounded-xl bg-gradient-to-br from-violet-500 via-electric-500 to-cyan-400 shadow-[0_4px_20px_-4px_rgba(139,92,246,0.7)]",
+          "relative grid place-items-center rounded-xl border border-white/10 bg-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.45)] p-1",
           dim
         )}
       >
-        <div className="absolute inset-0 rounded-xl bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.5),transparent_60%)]" />
-
         <img
-          src="/logo.png"
+          src="/bo-logo.png"
           alt="BankOS"
-          className="relative h-[85%] w-[85%] object-contain"
+          className="relative max-h-full max-w-full object-contain"
         />
       </div>
       
