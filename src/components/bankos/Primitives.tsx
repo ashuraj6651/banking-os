@@ -102,24 +102,22 @@ export function Wordmark({
   className?: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const dim = size === "sm" ? "h-12 w-12" : size === "lg" ? "h-18 w-18" : "h-16 w-16";
+  const dim = size === "sm" ? "h-9 w-9" : size === "lg" ? "h-14 w-14" : "h-12 w-12";
   const text =
     size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
 
   return (
-    <div className={cn("flex items-center gap-3 wordmark-glow", className)}>
+    <div className={cn("flex items-center gap-2.5 wordmark-glow", className)}>
       <div
         className={cn(
-          "relative grid place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.45)]",
+          "relative grid place-items-center rounded-xl border border-white/10 bg-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.45)] p-1",
           dim
         )}
       >
         <img
           src="/BOlogo.png"
           alt="BankOS"
-          width={64}
-          height={64}
-          className="h-full w-full object-contain"
+          className="relative max-h-full max-w-full object-contain"
         />
       </div>
       

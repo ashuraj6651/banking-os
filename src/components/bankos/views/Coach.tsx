@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import { Sparkles, Send, Sunrise, Moon, TrendingUp, Target } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
@@ -146,7 +147,41 @@ export function Coach() {
                         : "rounded-tr-sm bg-gradient-to-b from-violet-500 to-electric-600 text-white"
                     )}
                   >
-                    {m.content}
+                    {m.role === "assistant" ? (
+                      <div className="space-y-2.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="leading-relaxed">{children}</p>,
+                            strong: ({ children }) => (
+                              <strong className="font-semibold text-white">{children}</strong>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="list-disc space-y-1 pl-5">{children}</ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="list-decimal space-y-1 pl-5">{children}</ol>
+                            ),
+                            li: ({ children }) => <li className="pl-0.5">{children}</li>,
+                            h1: ({ children }) => (
+                              <h3 className="text-sm font-bold text-white mt-3">{children}</h3>
+                            ),
+                            h2: ({ children }) => (
+                              <h3 className="text-sm font-bold text-white mt-3">{children}</h3>
+                            ),
+                            h3: ({ children }) => (
+                              <h4 className="text-sm font-semibold text-violet-200 mt-3">{children}</h4>
+                            ),
+                            code: ({ children }) => (
+                              <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">{children}</code>
+                            ),
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      m.content
+                    )}
                   </div>
                 </motion.div>
               ))}
