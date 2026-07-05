@@ -117,9 +117,9 @@ export function Wordmark({
         <div className="absolute inset-0 rounded-xl bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.5),transparent_60%)]" />
 
         <img
-          src="/Bankingos-logo.png"
+          src="/logo.png"
           alt="BankOS"
-          className="relative h-[78%] w-[78%] object-contain"
+          className="relative h-[85%] w-[85%] object-contain"
         />
       </div>
       

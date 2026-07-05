@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "BankOS — Banking Exam Operating System",
   description: "AI-powered banking exam preparation. Mission control, adaptive practice, mock tests, and real-time analytics.",
   icons: {
-    icon: "/Bankingos-logo.png",
+    icon: "/logo.png",
   },
 };
 
