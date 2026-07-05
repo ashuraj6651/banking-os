@@ -567,8 +567,11 @@ export function SettingsView() {
                 <div className="flex items-center gap-2 text-xs text-white/40">
                   <span>Credits</span>
                 </div>
-                <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-white">
-                  Built with <Heart className="h-3.5 w-3.5 text-rose-400" /> for aspirants
+                <div className="mt-1 flex flex-col gap-1 text-sm font-semibold text-white">
+                  <div className="flex items-center gap-1.5">
+                    Built with <Heart className="h-3.5 w-3.5 text-rose-400" /> for aspirants
+                  </div>
+                  <div className="text-xs text-white/40">Made with <span className="text-rose-400">❤️</span> by ASHU</div>
                 </div>
               </div>
             </div>
