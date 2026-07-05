@@ -7,6 +7,7 @@ import {
 } from "@/lib/metrics";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // GET /api/analytics — computed from real attempts
 export async function GET() {
