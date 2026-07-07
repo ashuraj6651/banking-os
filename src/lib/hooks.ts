@@ -2,12 +2,31 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-async function jfetch<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    ...opts,
-  });
+async function jfetch<T>(url: string, opts?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const { timeoutMs = 30000, ...rest } = opts ?? {};
+
+  // Guard against requests that never resolve (e.g. a hung AI call on the
+  // server). Without this, a stuck backend call left the "Loading..." UI
+  // spinning forever with no way for the user to recover.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      signal: controller.signal,
+      ...rest,
+    });
+  } catch (e) {
+    if (controller.signal.aborted) {
+      throw new Error("Request timed out. Please try again.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     // Parse the server's error message so callers can show it to the user
     let serverMsg = "";
@@ -134,7 +153,25 @@ export function useToggleMission() {
   return useMutation({
     mutationFn: (id: string) =>
       jfetch(`/api/missions/${id}`, { method: "PATCH" }),
-    onSuccess: () => {
+    // Flip the checkbox in the local cache immediately instead of waiting
+    // for the PATCH + refetch round trip — this is what was making the
+    // checklist feel like it took 4-5s to respond.
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["missions"] });
+      const previous = qc.getQueryData<{ missions: Mission[] }>(["missions"]);
+      qc.setQueryData<{ missions: Mission[] } | undefined>(["missions"], (old) => {
+        if (!old) return old;
+        return {
+          missions: old.missions.map((m) => (m.id === id ? { ...m, done: !m.done } : m)),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      // Roll back if the server call actually failed.
+      if (context?.previous) qc.setQueryData(["missions"], context.previous);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["missions"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
     },
@@ -148,8 +185,12 @@ export function useQuestions(subject?: string, difficulty?: string, refreshKey =
   if (refreshKey > 0) params.set("refresh", "true");
   return useQuery({
     queryKey: ["questions", subject, difficulty, refreshKey],
-    queryFn: () => jfetch<{ questions: Question[] }>(`/api/questions?${params}`),
+    // Generous timeout since this can trigger AI question generation on the
+    // server, but capped so a hung Groq call can't spin the UI forever.
+    queryFn: () =>
+      jfetch<{ questions: Question[] }>(`/api/questions?${params}`, { timeoutMs: 45000 }),
     staleTime: 5 * 60 * 1000, // 5 min stale time for questions
+    retry: 1,
   });
 }
 
@@ -519,7 +560,34 @@ export function useToggleSyllabus() {
   return useMutation({
     mutationFn: (body: { subject: string; topic: string }) =>
       jfetch("/api/syllabus", { method: "PATCH", body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["syllabus"] }),
+    // Flip the checkbox in the local cache immediately instead of waiting on
+    // the PATCH + refetch round trip — this is what made every tap on the
+    // syllabus checklist feel like it took a few seconds to respond.
+    onMutate: async ({ subject, topic }: { subject: string; topic: string }) => {
+      await qc.cancelQueries({ queryKey: ["syllabus"] });
+      const previous = qc.getQueryData<{
+        progress: { subject: string; topic: string; checked: boolean; checkedAt: string | null }[];
+      }>(["syllabus"]);
+
+      qc.setQueryData<typeof previous>(["syllabus"], (old) => {
+        const rows = old?.progress ?? [];
+        const idx = rows.findIndex((p) => p.subject === subject && p.topic === topic);
+        if (idx === -1) {
+          // wasn't tracked yet — optimistically add it as checked
+          return { progress: [...rows, { subject, topic, checked: true, checkedAt: new Date().toISOString() }] };
+        }
+        const next = [...rows];
+        next[idx] = { ...next[idx], checked: !next[idx].checked };
+        return { progress: next };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      // Roll back if the server call actually failed.
+      if (context?.previous) qc.setQueryData(["syllabus"], context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["syllabus"] }),
   });
 }
 

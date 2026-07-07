@@ -9,15 +9,19 @@ export async function GET() {
   const profile = await getProfile();
   if (!profile) return NextResponse.json({ empty: true });
 
-  const attempts = await db.attempt.count({ where: { profileId: profile.id } });
-  const correct = await db.attempt.count({ where: { profileId: profile.id, correct: true } });
-  const sessions = await db.studySession.count({ where: { profileId: profile.id } });
-  const mocks = await db.mockTest.count({ where: { profileId: profile.id, status: "completed" } });
-  const achievements = await db.achievement.findMany({ where: { profileId: profile.id } });
-
-  const readiness = await computeReadiness(profile.id);
-
-  const sessionsAll = await db.studySession.findMany({ where: { profileId: profile.id } });
+  // None of these depend on each other — fetch them all together
+  // instead of one after another (this is what was making the
+  // dashboard slow to load).
+  const [attempts, correct, sessions, mocks, achievements, readiness, sessionsAll] =
+    await Promise.all([
+      db.attempt.count({ where: { profileId: profile.id } }),
+      db.attempt.count({ where: { profileId: profile.id, correct: true } }),
+      db.studySession.count({ where: { profileId: profile.id } }),
+      db.mockTest.count({ where: { profileId: profile.id, status: "completed" } }),
+      db.achievement.findMany({ where: { profileId: profile.id } }),
+      computeReadiness(profile.id),
+      db.studySession.findMany({ where: { profileId: profile.id } }),
+    ]);
   const heatmap: number[] = [];
   for (let i = 83; i >= 0; i--) {
     const d = new Date();

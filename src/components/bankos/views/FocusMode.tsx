@@ -47,7 +47,8 @@ export function FocusMode() {
   const { endSession, focusMission, focusMode } = useBankOS();
   // Filter questions by the mission's subject (or "All" for mock sessions)
   const subjectFilter = focusMission?.type ? MISSION_SUBJECT[focusMission.type] ?? "All" : "All";
-  const { data: qData } = useQuestions(subjectFilter);
+  const { data: qData, isLoading: questionsLoading, isError: questionsErrored, refetch: refetchQuestions } =
+    useQuestions(subjectFilter);
   const submitAttempt = useSubmitAttempt();
   const startSession = useStartSession();
   const endSessionMut = useEndSession();
@@ -120,19 +121,26 @@ export function FocusMode() {
     endSession();
   }
 
-  async function answer(i: number) {
+  function answer(i: number) {
     if (revealed || !q) return;
     setSelected(i);
     setRevealed(true);
     setAttempted((a) => a + 1);
-    const res = await submitAttempt.mutateAsync({
+
+    // Reveal instantly using the answer key we already have client-side —
+    // don't make the user wait on the server just to see correct/wrong.
+    const isCorrect = i === q.answer;
+    setResult({ correct: isCorrect, answer: q.answer, explanation: q.explanation });
+    if (isCorrect) setCorrect((c) => c + 1);
+
+    // Log the attempt in the background (XP/streak/error-notebook) —
+    // this no longer blocks the UI.
+    submitAttempt.mutate({
       questionId: q.id,
       selected: i,
       context: "focus",
       timeTakenSec: seconds,
     });
-    setResult(res);
-    if (res.correct) setCorrect((c) => c + 1);
   }
 
   function next() {
@@ -149,12 +157,54 @@ export function FocusMode() {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
 
-  // Session ends ONLY when the mission's actual time is up, or there were
-  // never any questions to begin with. Running out of a small question bank
-  // no longer ends the session early — it loops back and keeps going.
-  const noQuestionsAtAll = questions.length === 0 && seconds > 5; // give the API a moment to load
+  // Session ends ONLY when the mission's actual time is up, or the
+  // questions fetch has actually finished and genuinely came back empty.
+  // Previously this also triggered while the questions were merely still
+  // loading (e.g. slow DB), which force-ejected the user to the "Session
+  // Complete" screen a few seconds after opening Focus Mode.
+  const noQuestionsAtAll = !questionsLoading && questions.length === 0;
   if (seconds >= durationSec || noQuestionsAtAll) {
     return <SessionComplete correct={correct} total={attempted} seconds={seconds} onFinish={finish} />;
+  }
+
+  // If the fetch genuinely failed (including our own timeout guard kicking
+  // in on a hung request), give the user a way out instead of leaving them
+  // staring at a spinner that will never resolve.
+  if (questionsErrored) {
+    return (
+      <div className="fixed inset-0 z-[90] grid place-items-center focus-veil">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-sm text-white/60">
+            Couldn&apos;t load questions. This can happen if the connection is slow.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refetchQuestions()}
+              className="rounded-xl bg-gradient-to-b from-violet-500 to-electric-600 px-5 py-2.5 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
+            <button
+              onClick={finish}
+              className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/60 hover:bg-white/10"
+            >
+              Back to Mission Control
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (questionsLoading || !q) {
+    return (
+      <div className="fixed inset-0 z-[90] grid place-items-center focus-veil">
+        <div className="flex items-center gap-3 text-white/60">
+          <Sparkles className="h-5 w-5 animate-pulse text-violet-300" />
+          Loading questions…
+        </div>
+      </div>
+    );
   }
 
   return (

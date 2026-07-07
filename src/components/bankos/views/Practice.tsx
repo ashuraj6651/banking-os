@@ -91,21 +91,26 @@ export function Practice() {
     setRefreshKey((k) => k + 1);
   }
 
-  // Auto-refresh when all questions are answered
-  const handleAnswer = useCallback(async (qId: string, idx: number) => {
+  // Reveal instantly — we already have the answer + explanation from the
+  // question payload, no need to wait on the server for that. The submit
+  // call still runs in the background to log XP/streak/error-notebook,
+  // but it no longer blocks the UI from showing correct/wrong.
+  const handleAnswer = useCallback((qId: string, idx: number, question: (typeof filtered)[number]) => {
     if (answered[qId]) return;
-    try {
-      const res = await submit.mutateAsync({
-        questionId: qId,
-        selected: idx,
-        context: "practice",
-      });
-      setAnswered((p) => ({ ...p, [qId]: { sel: idx, correct: res.correct, explanation: res.explanation } }));
-      if (res.correct) toast.success("Correct! +10 XP");
-      else toast.error("Not quite — saved to your Error Notebook");
-    } catch {
-      toast.error("Could not submit answer");
-    }
+
+    const correct = idx === question.answer;
+    setAnswered((p) => ({ ...p, [qId]: { sel: idx, correct, explanation: question.explanation } }));
+    if (correct) toast.success("Correct! +10 XP");
+    else toast.error("Not quite — saved to your Error Notebook");
+
+    submit.mutate(
+      { questionId: qId, selected: idx, context: "practice" },
+      {
+        onError: () => {
+          toast.error("Progress not saved — check your connection");
+        },
+      }
+    );
   }, [answered, submit]);
 
   return (
@@ -278,7 +283,7 @@ export function Practice() {
                           <button
                             key={idx}
                             disabled={revealed}
-                            onClick={() => handleAnswer(q.id, idx)}
+                            onClick={() => handleAnswer(q.id, idx, q)}
                             className={cn(
                               "flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-all",
                               !revealed && "border-white/10 bg-white/[0.03] hover:border-violet-400/40 hover:bg-violet-500/[0.06]",

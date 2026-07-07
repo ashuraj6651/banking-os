@@ -78,9 +78,18 @@ export async function computeReadiness(profileId: string): Promise<Readiness> {
 
   const overall = Math.round(avgMastery * 0.7 + coverage * 100 * 0.3);
 
-  // total attempts for confidence
-  const totalAttempts = await db.attempt.count({ where: { profileId } });
-  const correctAttempts = await db.attempt.count({ where: { profileId, correct: true } });
+  // focus score depends on today's sessions
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  // None of these depend on each other — fetch them all together
+  // instead of one after another.
+  const [totalAttempts, correctAttempts, completedMocks, todaySessions] = await Promise.all([
+    db.attempt.count({ where: { profileId } }),
+    db.attempt.count({ where: { profileId, correct: true } }),
+    db.mockTest.count({ where: { profileId, status: "completed" } }),
+    db.studySession.findMany({ where: { profileId, startedAt: { gte: startOfDay } } }),
+  ]);
   const accuracy = totalAttempts > 0 ? correctAttempts / totalAttempts : 0;
 
   // selection probability grows with readiness + volume of practice
@@ -88,7 +97,6 @@ export async function computeReadiness(profileId: string): Promise<Readiness> {
   const selectionProbability = Math.round(overall * 0.6 + accuracy * 100 * 0.25 + volumeFactor * 15);
 
   // predicted rank only meaningful after some mocks; null until then
-  const completedMocks = await db.mockTest.count({ where: { profileId, status: "completed" } });
   let predictedRank: number | null = null;
   if (completedMocks > 0) {
     const avgScore =
@@ -104,13 +112,6 @@ export async function computeReadiness(profileId: string): Promise<Readiness> {
   const preparationLevel =
     overall >= 85 ? "Elite" : overall >= 70 ? "Advanced" : overall >= 50 ? "Intermediate" : overall > 0 ? "Building" : "Beginner";
   const confidence = Math.round(accuracy * 100);
-
-  // focus score: based on today's sessions
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const todaySessions = await db.studySession.findMany({
-    where: { profileId, startedAt: { gte: startOfDay } },
-  });
   const todayQuestions = todaySessions.reduce((a, s) => a + s.questionsAttempted, 0);
   const focusScore = Math.min(100, Math.round(todayQuestions * 4 + todaySessions.length * 8));
 
@@ -273,23 +274,21 @@ export async function ensureTodayMissions(profileId: string) {
   }
 
   const generated = generateTodayMissions(profile);
-  const created: Awaited<ReturnType<typeof db.mission.create>>[] = [];
-  for (let i = 0; i < generated.length; i++) {
-    const m = generated[i];
-    created.push(
-      await db.mission.create({
-        data: {
-          date: startOfDay,
-          title: m.title,
-          type: m.type,
-          duration: m.duration,
-          order: i,
-          profileId,
-        },
-      })
-    );
-  }
-  return created;
+  // One batched insert instead of one DB round trip per mission.
+  await db.mission.createMany({
+    data: generated.map((m, i) => ({
+      date: startOfDay,
+      title: m.title,
+      type: m.type,
+      duration: m.duration,
+      order: i,
+      profileId,
+    })),
+  });
+  return db.mission.findMany({
+    where: { profileId, date: { gte: startOfDay, lt: endOfDay } },
+    orderBy: { order: "asc" },
+  });
 }
 
 /**
@@ -326,6 +325,59 @@ export async function touchStreak(profileId: string) {
 }
 
 /**
+ * Fast-path used by /api/attempts: does the XP award + streak update
+ * in a single profile fetch + single profile update instead of 6 separate
+ * DB round trips (this is what was causing the 5-6s delay on answer submit).
+ * Behavior is identical to calling awardXp() then touchStreak().
+ */
+export async function applyAttemptRewards(profileId: string, correct: boolean) {
+  const profile = await db.profile.findUnique({ where: { id: profileId } });
+  if (!profile) return null;
+
+  const xp = correct ? 10 : 3;
+  const newXp = profile.xp + xp;
+  const newLevel = Math.floor(newXp / 1000) + 1;
+  const newCoins = profile.coins + Math.floor(xp / 2);
+
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const last = profile.lastActiveDate ? new Date(profile.lastActiveDate) : null;
+  const lastDay = last ? new Date(last) : null;
+  if (lastDay) lastDay.setHours(0, 0, 0, 0);
+
+  let newStreak = profile.streak;
+  let newLastActiveDate = profile.lastActiveDate;
+
+  if (!lastDay) {
+    newStreak = 1;
+    newLastActiveDate = now;
+  } else {
+    const diffDays = Math.round((today.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) {
+      // already counted today — no streak change
+    } else if (diffDays === 1) {
+      newStreak = profile.streak + 1;
+      newLastActiveDate = now;
+    } else {
+      newStreak = 1;
+      newLastActiveDate = now;
+    }
+  }
+
+  return db.profile.update({
+    where: { id: profileId },
+    data: {
+      xp: newXp,
+      level: newLevel,
+      coins: newCoins,
+      streak: newStreak,
+      lastActiveDate: newLastActiveDate,
+    },
+  });
+}
+
+/**
  * Award XP and check achievements.
  */
 export async function awardXp(profileId: string, xp: number) {
@@ -359,13 +411,24 @@ type AchievementStats = {
   accuracy: number;
 };
 
-export async function checkAchievements(profileId: string) {
-  const profile = await db.profile.findUnique({ where: { id: profileId } });
+export async function checkAchievements(
+  profileId: string,
+  preloadedProfile?: { streak: number; level: number } | null
+) {
+  // If the caller already has a fresh profile (e.g. from applyAttemptRewards),
+  // reuse it instead of hitting the DB again.
+  const profile = preloadedProfile ?? (await db.profile.findUnique({ where: { id: profileId } }));
   if (!profile) return;
-  const attempts = await db.attempt.count({ where: { profileId } });
-  const correct = await db.attempt.count({ where: { profileId, correct: true } });
-  const sessions = await db.studySession.count({ where: { profileId } });
-  const mocks = await db.mockTest.count({ where: { profileId, status: "completed" } });
+
+  // These 4 counts don't depend on each other — run them together
+  // instead of one-by-one.
+  const [attempts, correct, sessions, mocks] = await Promise.all([
+    db.attempt.count({ where: { profileId } }),
+    db.attempt.count({ where: { profileId, correct: true } }),
+    db.studySession.count({ where: { profileId } }),
+    db.mockTest.count({ where: { profileId, status: "completed" } }),
+  ]);
+
   const stats: AchievementStats = {
     attempts,
     sessions,
@@ -374,17 +437,25 @@ export async function checkAchievements(profileId: string) {
     level: profile.level,
     accuracy: attempts > 0 ? correct / attempts : 0,
   };
-  const unlocked: string[] = [];
-  for (const def of ACHIEVEMENT_DEFS) {
-    if (def.check(stats)) {
-      const exists = await db.achievement.findUnique({
-        where: { profileId_key: { profileId, key: def.key } },
-      });
-      if (!exists) {
-        await db.achievement.create({ data: { key: def.key, profileId } });
-        unlocked.push(def.key);
-      }
-    }
+
+  const passing = ACHIEVEMENT_DEFS.filter((def) => def.check(stats));
+  if (passing.length === 0) return [];
+
+  // Check which of the passing achievements already exist in one query
+  // instead of one findUnique per achievement.
+  const existing = await db.achievement.findMany({
+    where: { profileId, key: { in: passing.map((d) => d.key) } },
+    select: { key: true },
+  });
+  const existingKeys = new Set(existing.map((e) => e.key));
+  const toCreate = passing.filter((d) => !existingKeys.has(d.key));
+
+  if (toCreate.length > 0) {
+    await db.achievement.createMany({
+      data: toCreate.map((d) => ({ key: d.key, profileId })),
+      skipDuplicates: true,
+    });
   }
-  return unlocked;
+
+  return toCreate.map((d) => d.key);
 }

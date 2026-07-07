@@ -30,24 +30,23 @@ export async function POST() {
     },
   });
 
-  // Generate fresh missions
+  // Generate fresh missions — one batched insert instead of one
+  // DB round trip per mission.
   const generated = generateTodayMissions(profile);
-  const created: Awaited<ReturnType<typeof db.mission.create>>[] = [];
-  for (let i = 0; i < generated.length; i++) {
-    const m = generated[i];
-    created.push(
-      await db.mission.create({
-        data: {
-          date: startOfDay,
-          title: m.title,
-          type: m.type,
-          duration: m.duration,
-          order: i,
-          profileId: profile.id,
-        },
-      })
-    );
-  }
+  await db.mission.createMany({
+    data: generated.map((m, i) => ({
+      date: startOfDay,
+      title: m.title,
+      type: m.type,
+      duration: m.duration,
+      order: i,
+      profileId: profile.id,
+    })),
+  });
+  const created = await db.mission.findMany({
+    where: { profileId: profile.id, date: { gte: startOfDay, lt: endOfDay } },
+    orderBy: { order: "asc" },
+  });
 
   return NextResponse.json({ missions: created });
 }

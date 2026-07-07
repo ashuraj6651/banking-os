@@ -228,46 +228,65 @@ export async function GET(req: NextRequest) {
     const startSubjectIdx = seedHash % subjectsToTry.length;
     subjectsToTry = [...subjectsToTry.slice(startSubjectIdx), ...subjectsToTry.slice(0, startSubjectIdx)];
 
+    // Work out the batches to run up front, then fire the AI calls for all
+    // of them concurrently. This used to run one subject at a time —
+    // sequentially awaiting each AI call — so with several subjects queued
+    // up (5-9 for a "balanced" mix) a slow AI response could stack up to a
+    // minute-plus of total wait, well past the point where the "Loading
+    // questions…" screen felt stuck. Running them in parallel means the
+    // total wait is roughly the slowest single call, not the sum of all of
+    // them, and the per-call timeout in lib/groq.ts caps that too.
+    const batchesToRun: { subj: string; diff: string; batchSize: number }[] = [];
+    let remainingToPlan = remaining;
+    let planCursor = generated;
     for (const subj of subjectsToTry) {
-      if (generated >= totalSlots) break;
-      const batchSize = Math.min(perBatch, totalSlots - generated);
-      const diff = shuffledDiffs[generated % shuffledDiffs.length];
+      if (remainingToPlan <= 0) break;
+      const batchSize = Math.min(perBatch, remainingToPlan);
+      const diff = shuffledDiffs[planCursor % shuffledDiffs.length];
+      batchesToRun.push({ subj, diff, batchSize });
+      remainingToPlan -= batchSize;
+      planCursor += batchSize;
+    }
 
-      try {
-        const aiQuestions = await generateQuestionsWithAI(
-          subj,
-          diff,
-          batchSize,
-          existingTexts,
-          profile.name
-        );
+    const batchResults = await Promise.allSettled(
+      batchesToRun.map((b) =>
+        generateQuestionsWithAI(b.subj, b.diff, b.batchSize, existingTexts, profile.name).then(
+          (aiQuestions) => ({ ...b, aiQuestions })
+        )
+      )
+    );
 
-        // Save to DB for persistence
-        for (const q of aiQuestions) {
-          try {
-            const created = await db.question.create({
-              data: {
-                subject: subj,
-                topic: q.topic,
-                difficulty: diff,
-                text: q.text,
-                options: JSON.stringify(q.options),
-                answer: q.answer,
-                explanation: q.explanation,
-              },
-            });
-            allNewQuestions.push({
-              ...created,
-              options: q.options,
-            });
-            generated++;
-            existingTexts.push(q.text);
-          } catch {
-            // Duplicate or error, skip
-          }
+    for (const result of batchResults) {
+      if (result.status !== "fulfilled") {
+        console.error("AI question generation failed:", result.reason);
+        continue;
+      }
+      const { subj, diff, aiQuestions } = result.value;
+
+      // Save to DB for persistence
+      for (const q of aiQuestions) {
+        if (generated >= totalSlots) break;
+        try {
+          const created = await db.question.create({
+            data: {
+              subject: subj,
+              topic: q.topic,
+              difficulty: diff,
+              text: q.text,
+              options: JSON.stringify(q.options),
+              answer: q.answer,
+              explanation: q.explanation,
+            },
+          });
+          allNewQuestions.push({
+            ...created,
+            options: q.options,
+          });
+          generated++;
+          existingTexts.push(q.text);
+        } catch {
+          // Duplicate or error, skip
         }
-      } catch (err) {
-        console.error(`AI question generation failed for ${subj}:`, err);
       }
     }
   }

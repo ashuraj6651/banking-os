@@ -12,7 +12,14 @@ function getClient(): Groq {
     throw new Error("GROQ_API_KEY not found");
   }
   if (!client) {
-    client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    // Without an explicit timeout, a slow/hung Groq connection could keep
+    // the request (and every SDK retry) waiting indefinitely, which is what
+    // made "Loading questions…" get stuck on the client with no way out.
+    client = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+      timeout: 20 * 1000, // 20s per request
+      maxRetries: 1,
+    });
   }
   return client;
 }
