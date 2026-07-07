@@ -10,9 +10,25 @@ import { useBankOS as useBOS } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function SkillTree() {
-  const { startSession } = useBOS();
+  const { setView } = useBOS();
   const { data, isLoading } = useSkillTree();
   const tree = data?.tree ?? [];
+
+  function practiceTopic(subjectName: string, topicName: string) {
+    // Reuses the same "preset Practice filters" mechanism CurrentAffairs'
+    // "Take Quiz" button uses, so clicking a Skill Tree node actually opens
+    // questions for that exact subject + topic instead of a random mix
+    // from every section.
+    try {
+      localStorage.setItem(
+        "bankos_practice_filter",
+        JSON.stringify({ subject: subjectName, difficulty: "All", topic: topicName })
+      );
+    } catch {
+      // localStorage unavailable — Practice will just show unfiltered
+    }
+    setView("practice");
+  }
 
   return (
     <div className="space-y-6">
@@ -78,7 +94,7 @@ export function SkillTree() {
                           {child.attempts > 0 ? `${child.mastery}% · ${child.attempts} attempts` : "Not attempted"}
                         </div>
                       </div>
-                      <button onClick={() => startSession()} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-violet-400/40 hover:text-violet-200">
+                      <button onClick={() => practiceTopic(root.name, child.name)} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-violet-400/40 hover:text-violet-200">
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>

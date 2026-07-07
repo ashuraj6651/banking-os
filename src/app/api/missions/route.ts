@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const profile = await getProfile();
   if (!profile) return NextResponse.json({ missions: [] });
-  const missions = await ensureTodayMissions(profile.id);
+  const missions = await ensureTodayMissions(profile.id, profile);
   return NextResponse.json({ missions });
 }
 

@@ -17,6 +17,7 @@ export function Practice() {
   const { startSession } = useBankOS();
   const [subject, setSubject] = useState<(typeof SUBJECTS)[number]>("All");
   const [diff, setDiff] = useState<(typeof DIFFS)[number]>("All");
+  const [topic, setTopic] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<string>>(() => {
     // Restore bookmarks from localStorage
     try {
@@ -31,18 +32,20 @@ export function Practice() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const submit = useSubmitAttempt();
 
-  // Read filter preference from localStorage (set by CurrentAffairs "Take Quiz")
+  // Read filter preference from localStorage (set by CurrentAffairs "Take Quiz"
+  // or the Skill Tree's "practice this topic" action)
   useEffect(() => {
     try {
       const saved = localStorage.getItem("bankos_practice_filter");
       if (saved) {
-        const filter = JSON.parse(saved) as { subject: string; difficulty: string };
+        const filter = JSON.parse(saved) as { subject: string; difficulty: string; topic?: string };
         if (filter.subject && SUBJECTS.includes(filter.subject as typeof SUBJECTS[number])) {
           setSubject(filter.subject as typeof SUBJECTS[number]);
         }
         if (filter.difficulty && DIFFS.includes(filter.difficulty as typeof DIFFS[number])) {
           setDiff(filter.difficulty as typeof DIFFS[number]);
         }
+        if (filter.topic) setTopic(filter.topic);
         localStorage.removeItem("bankos_practice_filter");
       }
     } catch {
@@ -59,7 +62,7 @@ export function Practice() {
     }
   }, [bookmarks]);
 
-  const { data, isLoading, isError } = useQuestions(subject, diff, refreshKey);
+  const { data, isLoading, isError } = useQuestions(subject, diff, refreshKey, topic ?? undefined);
   const filtered = data?.questions ?? [];
 
   const answeredCount = Object.keys(answered).length;
@@ -149,11 +152,19 @@ export function Practice() {
               <span className="ml-2 text-xs text-violet-300">{answeredCount}/{filtered.length} answered</span>
             )}
           </div>
+          {topic && (
+            <div className="flex items-center gap-1.5 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200">
+              Topic: {topic}
+              <button onClick={() => setTopic(null)} className="ml-1 text-violet-300/70 hover:text-violet-100">
+                ×
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {SUBJECTS.map((s) => (
               <button
                 key={s}
-                onClick={() => { setSubject(s); setAnswered({}); }}
+                onClick={() => { setSubject(s); setAnswered({}); setTopic(null); }}
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                   subject === s

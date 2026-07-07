@@ -35,7 +35,8 @@ async function generateQuestionsWithAI(
   difficulty: string,
   count: number,
   existingQuestionTexts: string[],
-  profileName: string
+  profileName: string,
+  topicOverride?: string
 ): Promise<{ text: string; options: string[]; answer: number; explanation: string; topic: string }[]> {
   if (!process.env.GROQ_API_KEY) {
     return [];
@@ -49,13 +50,35 @@ async function generateQuestionsWithAI(
     "Banking": "banking products, negotiable instruments, accounts, insurance, RBI history, monetary policy, banking regulation, payment systems",
   };
 
-  const topics = subjectTopics[subject] || "general banking exam topics";
+  // If a specific topic was requested (e.g. clicking a single node in the
+  // Skill Tree), generate only for that topic instead of the whole
+  // subject's topic list — otherwise "practice this one topic" quietly
+  // turned into "practice anything in this subject".
+  const topics = topicOverride || subjectTopics[subject] || "general banking exam topics";
 
   const existingTextsList = existingQuestionTexts.length > 0
     ? `\n\nIMPORTANT: Do NOT use any of these existing question texts (avoid duplicates):\n${existingQuestionTexts.slice(0, 10).join("\n")}`
     : "";
 
-  const prompt = `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}".
+  const prompt = topicOverride
+    ? `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}", specifically on the topic "${topicOverride}" — every question must be about this exact topic, nothing else.
+
+Requirements:
+- Each question must have exactly 4 options (A, B, C, D)
+- Questions should be realistic banking exam questions (like SBI PO, IBPS PO, RBI Grade B)
+- ${difficulty} difficulty level
+- Provide clear, concise explanations (1-2 sentences)
+- Every question must stay strictly on the topic "${topicOverride}"
+- Make questions different from each other
+- Answer should be the 0-based index (0=A, 1=B, 2=C, 3=D)
+- Set the "topic" field in your response to exactly "${topicOverride}"
+${existingTextsList}
+
+Return ONLY valid JSON array with no markdown, no code fences, no explanation outside JSON. Format:
+[{"text":"question text","options":["option A","option B","option C","option D"],"answer":0,"explanation":"explanation","topic":"${topicOverride}"}]
+
+Generate the questions now:`
+    : `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}".
 
 Topics to cover: ${topics}
 
@@ -111,6 +134,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const subject = searchParams.get("subject");
   const difficulty = searchParams.get("difficulty");
+  const topic = searchParams.get("topic");
   const limit = Number(searchParams.get("limit") || "10");
   const refresh = searchParams.get("refresh") === "true";
 
@@ -121,6 +145,7 @@ export async function GET(req: NextRequest) {
     const where: Record<string, unknown> = {};
     if (subject && subject !== "All") where.subject = subject;
     if (difficulty && difficulty !== "All") where.difficulty = difficulty;
+    if (topic) where.topic = topic;
 
     const questions = await db.question.findMany({
       where,
@@ -139,7 +164,8 @@ export async function GET(req: NextRequest) {
   // Build cache key
   const subjectKey = (!subject || subject === "All") ? "All" : subject;
   const diffKey = (!difficulty || difficulty === "All") ? "All" : difficulty;
-  const cacheKey = getCacheKey(profile.id, subjectKey, diffKey);
+  const topicKey = topic || "All";
+  const cacheKey = getCacheKey(profile.id, subjectKey, diffKey) + `:${topicKey}`;
 
   // Check cache (unless refresh is requested)
   if (!refresh) {
@@ -154,13 +180,18 @@ export async function GET(req: NextRequest) {
     where: {
       ...(subject && subject !== "All" ? { subject } : {}),
       ...(difficulty && difficulty !== "All" ? { difficulty } : {}),
+      ...(topic ? { topic } : {}),
     },
     select: { text: true },
     take: 50,
   });
   const existingTexts = existingQuestions.map(q => q.text);
 
-  // Determine which subjects to generate
+  // Determine which subjects to generate. A specific topic implies a
+  // specific subject too — no point balancing across other subjects when
+  // the person asked for practice on one exact topic (this was the bug:
+  // clicking a Skill Tree topic ignored subject/topic entirely and pulled
+  // from every subject at random).
   const subjectsToGen = subject && subject !== "All"
     ? [subject]
     : getSubjectsForBalance(profile.weakSubjects);
@@ -189,6 +220,7 @@ export async function GET(req: NextRequest) {
     where: {
       ...(subject && subject !== "All" ? { subject } : {}),
       ...(difficulty && difficulty !== "All" ? { difficulty } : {}),
+      ...(topic ? { topic } : {}),
       id: { notIn: Array.from(attemptedSet) },
     },
     take: limit,
@@ -250,7 +282,7 @@ export async function GET(req: NextRequest) {
 
     const batchResults = await Promise.allSettled(
       batchesToRun.map((b) =>
-        generateQuestionsWithAI(b.subj, b.diff, b.batchSize, existingTexts, profile.name).then(
+        generateQuestionsWithAI(b.subj, b.diff, b.batchSize, existingTexts, profile.name, topic || undefined).then(
           (aiQuestions) => ({ ...b, aiQuestions })
         )
       )

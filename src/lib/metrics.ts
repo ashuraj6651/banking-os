@@ -204,8 +204,14 @@ export function generateTodayMissions(profile: {
 /**
  * Ensure today's missions exist for a profile (idempotent).
  */
-export async function ensureTodayMissions(profileId: string) {
-  const profile = await db.profile.findUnique({ where: { id: profileId } });
+export async function ensureTodayMissions(profileId: string, preloadedProfile?: {
+  studyHoursPerDay: number;
+  weakSubjects: string;
+}) {
+  // The route handler that calls this already fetched the profile via
+  // getProfile() — re-fetching it here was one extra DB round trip on
+  // every single dashboard load for no reason.
+  const profile = preloadedProfile ?? (await db.profile.findUnique({ where: { id: profileId } }));
   if (!profile) return [];
 
   const startOfDay = new Date();

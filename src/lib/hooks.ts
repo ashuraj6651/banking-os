@@ -178,13 +178,14 @@ export function useToggleMission() {
   });
 }
 
-export function useQuestions(subject?: string, difficulty?: string, refreshKey = 0) {
+export function useQuestions(subject?: string, difficulty?: string, refreshKey = 0, topic?: string) {
   const params = new URLSearchParams();
   if (subject && subject !== "All") params.set("subject", subject);
   if (difficulty && difficulty !== "All") params.set("difficulty", difficulty);
+  if (topic) params.set("topic", topic);
   if (refreshKey > 0) params.set("refresh", "true");
   return useQuery({
-    queryKey: ["questions", subject, difficulty, refreshKey],
+    queryKey: ["questions", subject, difficulty, refreshKey, topic],
     // Generous timeout since this can trigger AI question generation on the
     // server, but capped so a hung Groq call can't spin the UI forever.
     queryFn: () =>
