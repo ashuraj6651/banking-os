@@ -25,16 +25,43 @@ const BRIEFINGS = [
 ] as const;
 
 export function Coach() {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      content:
-        "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?",
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/coach")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data?.messages)) setMessages(data.messages);
+      })
+      .catch(() => {
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?",
+          },
+        ]);
+      })
+      .finally(() => setHistoryLoaded(true));
+  }, []);
+
+  async function clearHistory() {
+    setMessages([]);
+    try {
+      await fetch("/api/coach", { method: "DELETE" });
+    } catch {
+      // ignore — best effort
+    }
+    fetch("/api/coach")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data?.messages)) setMessages(data.messages);
+      });
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -83,6 +110,14 @@ export function Coach() {
         badgeIcon={<Sparkles className="h-3 w-3" />}
         title="Your AI Coach"
         subtitle="Briefings, performance analysis, motivation and personalised strategy — updated every day."
+        actions={
+          <button
+            onClick={clearHistory}
+            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/50 transition-all hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
+          >
+            Clear chat
+          </button>
+        }
       />
 
       {/* Briefing cards */}
@@ -121,6 +156,12 @@ export function Coach() {
       <GlassCard hover={false} className="overflow-hidden">
         <div className="flex h-[560px] flex-col">
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-6 scrollbar-premium">
+            {!historyLoaded && (
+              <div className="space-y-3">
+                <div className="h-14 w-2/3 animate-pulse rounded-2xl bg-white/[0.04]" />
+                <div className="ml-auto h-10 w-1/2 animate-pulse rounded-2xl bg-white/[0.04]" />
+              </div>
+            )}
             <AnimatePresence initial={false}>
               {messages.map((m, i) => (
                 <motion.div

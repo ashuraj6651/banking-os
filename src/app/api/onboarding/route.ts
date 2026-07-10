@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/groq";
+import { generateText, hasAnyAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { ensureTodayMissions, touchStreak, getProfile } from "@/lib/metrics";
 import { getAccount } from "@/lib/auth";
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
     let roadmap = "";
 
     try {
-      if (!process.env.GROQ_API_KEY) {
-        throw new Error("GROQ_API_KEY not found");
+      if (!hasAnyAIProvider()) {
+        throw new Error("No AI provider configured");
       }
 
       const daysLeft = Math.max(

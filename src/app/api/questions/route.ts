@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/groq";
+import { generateText, hasAnyAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { getProfile } from "@/lib/metrics";
 
@@ -38,7 +38,7 @@ async function generateQuestionsWithAI(
   profileName: string,
   topicOverride?: string
 ): Promise<{ text: string; options: string[]; answer: number; explanation: string; topic: string }[]> {
-  if (!process.env.GROQ_API_KEY) {
+  if (!hasAnyAIProvider()) {
     return [];
   }
 

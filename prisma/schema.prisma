@@ -58,6 +58,7 @@ model Profile {
   revisions    RevisionItem[]
   achievements Achievement[]
   syllabus     SyllabusProgress[]
+  coachMessages CoachMessage[]
 }
 
 model SyllabusProgress {
@@ -164,6 +165,17 @@ model CurrentAffair {
   title   String
   summary String
   date    DateTime @default(now())
+}
+
+model CoachMessage {
+  id        String   @id @default(cuid())
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
 }
 
 model Achievement {

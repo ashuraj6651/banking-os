@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/groq";
+import { generateText, hasAnyAIProvider } from "@/lib/ai";
 import { db } from "@/lib/db";
 import { getProfile } from "@/lib/metrics";
 
@@ -37,7 +37,7 @@ export async function GET() {
 // POST /api/current-affairs — refresh & generate new current affairs via AI
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.GROQ_API_KEY) {
+    if (!hasAnyAIProvider()) {
       return NextResponse.json({ error: "AI service not configured" }, { status: 500 });
     }
 

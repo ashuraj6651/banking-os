@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateChatReply } from "@/lib/groq";
+import { generateChatReply, hasAnyAIProvider } from "@/lib/ai";
+import { db } from "@/lib/db";
+import { getProfile } from "@/lib/metrics";
+
+export const runtime = "nodejs";
 
 const SYSTEM_PROMPT = `
 You are Mentor, the AI Coach inside BankOS.
@@ -14,6 +18,41 @@ Formatting rules (always follow):
 - Keep responses tight and skimmable — avoid long walls of text.
 `;
 
+const DEFAULT_GREETING =
+  "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?";
+
+// GET /api/coach — return saved chat history for the logged-in profile.
+// If there's no history yet, seed it with the default greeting so the
+// UI always has something to render (and persists that greeting too).
+export async function GET() {
+  const profile = await getProfile();
+  if (!profile) {
+    return NextResponse.json({
+      messages: [{ role: "assistant", content: DEFAULT_GREETING }],
+    });
+  }
+
+  let history = await db.coachMessage.findMany({
+    where: { profileId: profile.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (history.length === 0) {
+    const seeded = await db.coachMessage.create({
+      data: { profileId: profile.id, role: "assistant", content: DEFAULT_GREETING },
+    });
+    history = [seeded];
+  }
+
+  return NextResponse.json({
+    messages: history.map((m) => ({ role: m.role, content: m.content })),
+  });
+}
+
+// POST /api/coach — send a new user message, get + persist the AI reply.
+// Body: { messages: {role, content}[] } — the full running conversation
+// (same shape as before, for the AI call), but only the LAST user message
+// in that array is actually saved (earlier turns are already persisted).
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
@@ -21,17 +60,31 @@ export async function POST(req: NextRequest) {
     console.log("MESSAGES RECEIVED:");
     console.log(messages);
 
-    if (!process.env.GROQ_API_KEY) {
+    if (!hasAnyAIProvider()) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY not found" },
+        { error: "No AI provider configured (set GEMINI_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY)" },
         { status: 500 }
       );
     }
 
+    const profile = await getProfile();
+    const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === "user");
+
+    if (profile && lastUserMessage) {
+      await db.coachMessage.create({
+        data: { profileId: profile.id, role: "user", content: lastUserMessage.content },
+      });
+    }
+
     const content = await generateChatReply(SYSTEM_PROMPT, messages);
 
-    return NextResponse.json({ content });
+    if (profile) {
+      await db.coachMessage.create({
+        data: { profileId: profile.id, role: "assistant", content },
+      });
+    }
 
+    return NextResponse.json({ content });
   } catch (e) {
     console.error("FULL ERROR:", e);
 
@@ -42,4 +95,14 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// DELETE /api/coach — clear chat history for the logged-in profile.
+export async function DELETE() {
+  const profile = await getProfile();
+  if (!profile) {
+    return NextResponse.json({ ok: true });
+  }
+  await db.coachMessage.deleteMany({ where: { profileId: profile.id } });
+  return NextResponse.json({ ok: true });
 }

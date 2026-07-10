@@ -15,6 +15,9 @@ import {
   Target,
   Timer,
   ChevronRight,
+  Settings2,
+  X,
+  Check,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard, GlassPanel } from "../GlassCard";
@@ -28,8 +31,54 @@ const SESSIONS_BEFORE_LONG = 4;
 const STORAGE_KEY = "bankos-pomodoro";
 const SOUND_KEY = "bankos-pomodoro-sound";
 const STATS_KEY = "bankos-pomodoro-stats";
+const DURATIONS_KEY = "bankos-pomodoro-durations";
 
 type TimerMode = "focus" | "shortBreak" | "longBreak";
+
+interface TimerDurations {
+  focus: number;
+  shortBreak: number;
+  longBreak: number;
+}
+
+const DEFAULT_DURATIONS: TimerDurations = {
+  focus: FOCUS_MINUTES,
+  shortBreak: SHORT_BREAK_MINUTES,
+  longBreak: LONG_BREAK_MINUTES,
+};
+
+function loadDurations(): TimerDurations {
+  if (typeof window === "undefined") return DEFAULT_DURATIONS;
+  try {
+    const raw = localStorage.getItem(DURATIONS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<TimerDurations>;
+      return {
+        focus: clampMinutes(parsed.focus, DEFAULT_DURATIONS.focus),
+        shortBreak: clampMinutes(parsed.shortBreak, DEFAULT_DURATIONS.shortBreak),
+        longBreak: clampMinutes(parsed.longBreak, DEFAULT_DURATIONS.longBreak),
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_DURATIONS;
+}
+
+function saveDurations(durations: TimerDurations) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DURATIONS_KEY, JSON.stringify(durations));
+  } catch {
+    // ignore
+  }
+}
+
+function clampMinutes(value: unknown, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(180, Math.max(1, Math.round(n)));
+}
 
 const MODE_CONFIG: Record<TimerMode, { label: string; minutes: number; color: string; gradient: string; icon: typeof Brain }> = {
   focus: { label: "Focus", minutes: FOCUS_MINUTES, color: "#8b5cf6", gradient: "from-violet-500 to-electric-500", icon: Brain },
@@ -58,6 +107,7 @@ interface TimerState {
   totalSeconds: number;
   isRunning: boolean;
   sessionsCompleted: number;
+  _savedAt?: number;
 }
 
 interface DayStats {
@@ -291,6 +341,9 @@ function ModeSelector({
 export function StudyTimer() {
   const [timerState, setTimerState] = useState<TimerState>(loadTimerState);
   const [dayStats, setDayStats] = useState<DayStats>(loadDayStats);
+  const [durations, setDurations] = useState<TimerDurations>(loadDurations);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [durationDraft, setDurationDraft] = useState<TimerDurations>(durations);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
     const raw = localStorage.getItem(SOUND_KEY);
@@ -304,6 +357,19 @@ export function StudyTimer() {
   useEffect(() => {
     isRunningRef.current = timerState.isRunning;
   }, [timerState.isRunning]);
+
+  // On mount: if a custom duration was saved and the timer isn't running,
+  // make sure the displayed time reflects it (loadTimerState() runs before
+  // durations are known, so it can't do this itself).
+  useEffect(() => {
+    setTimerState((prev) => {
+      if (prev.isRunning) return prev;
+      const minutes = durations[prev.mode];
+      if (prev.totalSeconds === minutes * 60) return prev;
+      return { ...prev, remainingSeconds: minutes * 60, totalSeconds: minutes * 60 };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist timer state
   useEffect(() => {
@@ -341,7 +407,7 @@ export function StudyTimer() {
       saveDayStats(newStats);
 
       const nextMode: TimerMode = newSessions % SESSIONS_BEFORE_LONG === 0 ? "longBreak" : "shortBreak";
-      const nextMinutes = MODE_CONFIG[nextMode].minutes;
+      const nextMinutes = durations[nextMode];
       return {
         mode: nextMode,
         remainingSeconds: nextMinutes * 60,
@@ -350,7 +416,7 @@ export function StudyTimer() {
         sessionsCompleted: newSessions,
       };
     } else {
-      const nextMinutes = MODE_CONFIG.focus.minutes;
+      const nextMinutes = durations.focus;
       return {
         mode: "focus",
         remainingSeconds: nextMinutes * 60,
@@ -359,7 +425,7 @@ export function StudyTimer() {
         sessionsCompleted: prev.sessionsCompleted,
       };
     }
-  }, [dayStats]);
+  }, [dayStats, durations]);
 
   // Timer tick
   useEffect(() => {
@@ -385,28 +451,40 @@ export function StudyTimer() {
   }, []);
 
   const resetTimer = useCallback(() => {
-    const config = MODE_CONFIG[timerState.mode];
+    const minutes = durations[timerState.mode];
     setTimerState((prev) => ({
       ...prev,
-      remainingSeconds: config.minutes * 60,
-      totalSeconds: config.minutes * 60,
+      remainingSeconds: minutes * 60,
+      totalSeconds: minutes * 60,
       isRunning: false,
     }));
-  }, [timerState.mode]);
+  }, [timerState.mode, durations]);
 
   const switchMode = useCallback((mode: TimerMode) => {
-    const config = MODE_CONFIG[mode];
+    const minutes = durations[mode];
     setTimerState((prev) => ({
       ...prev,
       mode,
-      remainingSeconds: config.minutes * 60,
-      totalSeconds: config.minutes * 60,
+      remainingSeconds: minutes * 60,
+      totalSeconds: minutes * 60,
       isRunning: false,
     }));
-  }, []);
+  }, [durations]);
 
   const toggleSound = useCallback(() => {
     setSoundEnabled((prev) => !prev);
+  }, []);
+
+  // Persist duration preferences, and apply new durations to the
+  // current mode immediately if the timer isn't running right now.
+  const applyDurations = useCallback((next: TimerDurations) => {
+    setDurations(next);
+    saveDurations(next);
+    setTimerState((prev) => {
+      if (prev.isRunning) return prev; // don't yank time out from under an active session
+      const minutes = next[prev.mode];
+      return { ...prev, remainingSeconds: minutes * 60, totalSeconds: minutes * 60 };
+    });
   }, []);
 
   // Computed
@@ -426,22 +504,119 @@ export function StudyTimer() {
         badge="Focus"
         badgeIcon={<Clock className="h-3 w-3" />}
         title="Study Timer"
-        subtitle="Pomodoro technique — focused 25-min sprints with strategic breaks"
+        subtitle={`Pomodoro technique — focused ${durations.focus}-min sprints with strategic breaks`}
         actions={
-          <button
-            onClick={toggleSound}
-            className={cn(
-              "grid h-9 w-9 place-items-center rounded-xl border transition-colors",
-              soundEnabled
-                ? "border-white/10 bg-white/5 text-white/60 hover:text-white"
-                : "border-white/5 text-white/25"
-            )}
-            title={soundEnabled ? "Mute notifications" : "Enable notifications"}
-          >
-            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </button>
+          <>
+            <button
+              onClick={() => {
+                setDurationDraft(durations);
+                setSettingsOpen((v) => !v);
+              }}
+              className={cn(
+                "grid h-9 w-9 place-items-center rounded-xl border transition-colors",
+                settingsOpen
+                  ? "border-violet-400/40 bg-violet-500/10 text-violet-300"
+                  : "border-white/10 bg-white/5 text-white/60 hover:text-white"
+              )}
+              title="Customise timer durations"
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={toggleSound}
+              className={cn(
+                "grid h-9 w-9 place-items-center rounded-xl border transition-colors",
+                soundEnabled
+                  ? "border-white/10 bg-white/5 text-white/60 hover:text-white"
+                  : "border-white/5 text-white/25"
+              )}
+              title={soundEnabled ? "Mute notifications" : "Enable notifications"}
+            >
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+          </>
         }
       />
+
+      {/* Duration settings panel */}
+      <AnimatePresence>
+        {settingsOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <GlassCard hover={false}>
+              <div className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">Timer Durations</h3>
+                  <button
+                    onClick={() => setSettingsOpen(false)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-white/40 hover:bg-white/5 hover:text-white/70"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {(["focus", "shortBreak", "longBreak"] as TimerMode[]).map((mode) => (
+                    <div key={mode}>
+                      <label className="mb-1.5 block text-xs text-white/50">
+                        {MODE_CONFIG[mode].label}
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={180}
+                          value={durationDraft[mode]}
+                          onChange={(e) =>
+                            setDurationDraft((prev) => ({
+                              ...prev,
+                              [mode]: e.target.value === "" ? 0 : Number(e.target.value),
+                            }))
+                          }
+                          className="w-full bg-transparent text-sm text-white focus:outline-none tabular-nums"
+                        />
+                        <span className="shrink-0 text-xs text-white/40">min</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setDurationDraft(DEFAULT_DURATIONS)}
+                    className="rounded-xl px-3 py-2 text-xs text-white/40 hover:text-white/70"
+                  >
+                    Reset to defaults
+                  </button>
+                  <button
+                    onClick={() => {
+                      const clamped: TimerDurations = {
+                        focus: clampMinutes(durationDraft.focus, DEFAULT_DURATIONS.focus),
+                        shortBreak: clampMinutes(durationDraft.shortBreak, DEFAULT_DURATIONS.shortBreak),
+                        longBreak: clampMinutes(durationDraft.longBreak, DEFAULT_DURATIONS.longBreak),
+                      };
+                      applyDurations(clamped);
+                      setSettingsOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-b from-violet-500 to-electric-600 px-4 py-2 text-xs font-medium text-white shadow-lg hover:shadow-violet-500/30"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Save
+                  </button>
+                </div>
+                {timerState.isRunning && (
+                  <p className="mt-3 text-xs text-amber-300/70">
+                    Timer is currently running — new durations will apply from the next session.
+                  </p>
+                )}
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Timer card */}
       <GlassCard hover={false} className="relative overflow-hidden">
@@ -595,10 +770,10 @@ export function StudyTimer() {
           <h3 className="text-sm font-semibold text-white mb-4">How Pomodoro Works</h3>
           <div className="grid gap-3 sm:grid-cols-4">
             {[
-              { step: "1", title: "Focus", desc: "25 minutes of deep work", color: "text-violet-300", border: "border-violet-500/20" },
-              { step: "2", title: "Short Break", desc: "5 minutes to recharge", color: "text-cyan-300", border: "border-cyan-500/20" },
+              { step: "1", title: "Focus", desc: `${durations.focus} minutes of deep work`, color: "text-violet-300", border: "border-violet-500/20" },
+              { step: "2", title: "Short Break", desc: `${durations.shortBreak} minutes to recharge`, color: "text-cyan-300", border: "border-cyan-500/20" },
               { step: "3", title: "Repeat", desc: "3 more focus cycles", color: "text-violet-300", border: "border-violet-500/20" },
-              { step: "4", title: "Long Break", desc: "15 minutes rest", color: "text-emerald-300", border: "border-emerald-500/20" },
+              { step: "4", title: "Long Break", desc: `${durations.longBreak} minutes rest`, color: "text-emerald-300", border: "border-emerald-500/20" },
             ].map((item) => (
               <div
                 key={item.step}
