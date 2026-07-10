@@ -35,6 +35,29 @@ interface ProviderConfig {
   call: AttemptFn;
 }
 
+function normalizeGeminiMessages(messages: ChatMessage[]): ChatMessage[] {
+  const cleaned: ChatMessage[] = [];
+
+  for (const msg of messages) {
+    const role = msg.role === "assistant" ? "assistant" : "user";
+
+    if (cleaned.length === 0) {
+      if (role !== "user") continue;
+      cleaned.push({ role, content: msg.content });
+      continue;
+    }
+
+    const last = cleaned[cleaned.length - 1];
+
+    if (last.role === role) {
+      last.content += "\n\n" + msg.content;
+    } else {
+      cleaned.push({ role, content: msg.content });
+    }
+  }
+
+  return cleaned;
+}
 // ---------- Gemini ----------
 let geminiClient: GoogleGenerativeAI | null = null;
 function getGemini(): GoogleGenerativeAI {
@@ -58,9 +81,8 @@ const callGemini: AttemptFn = async (systemPrompt, messages, model) => {
   // Gemini requires the conversation to start with a 'user' turn — drop
   // any leading assistant messages (e.g. a seeded greeting) so history
   // never opens with role 'model'.
-  const firstUserIdx = messages.findIndex((m) => m.role === "user");
-  const trimmed = firstUserIdx === -1 ? [] : messages.slice(firstUserIdx);
-
+  const trimmed = normalizeGeminiMessages(messages);
+  
   if (trimmed.length === 0) {
     // Nothing usable for Gemini's chat format — fall back to a plain
     // single-shot prompt using the last message's content, if any.
