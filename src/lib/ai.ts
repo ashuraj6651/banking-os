@@ -35,29 +35,6 @@ interface ProviderConfig {
   call: AttemptFn;
 }
 
-function normalizeGeminiMessages(messages: ChatMessage[]): ChatMessage[] {
-  const cleaned: ChatMessage[] = [];
-
-  for (const msg of messages) {
-    const role = msg.role === "assistant" ? "assistant" : "user";
-
-    if (cleaned.length === 0) {
-      if (role !== "user") continue;
-      cleaned.push({ role, content: msg.content });
-      continue;
-    }
-
-    const last = cleaned[cleaned.length - 1];
-
-    if (last.role === role) {
-      last.content += "\n\n" + msg.content;
-    } else {
-      cleaned.push({ role, content: msg.content });
-    }
-  }
-
-  return cleaned;
-}
 // ---------- Gemini ----------
 let geminiClient: GoogleGenerativeAI | null = null;
 function getGemini(): GoogleGenerativeAI {
@@ -81,8 +58,9 @@ const callGemini: AttemptFn = async (systemPrompt, messages, model) => {
   // Gemini requires the conversation to start with a 'user' turn — drop
   // any leading assistant messages (e.g. a seeded greeting) so history
   // never opens with role 'model'.
-  const trimmed = normalizeGeminiMessages(messages);
-  
+  const firstUserIdx = messages.findIndex((m) => m.role === "user");
+  const trimmed = firstUserIdx === -1 ? [] : messages.slice(firstUserIdx);
+
   if (trimmed.length === 0) {
     // Nothing usable for Gemini's chat format — fall back to a plain
     // single-shot prompt using the last message's content, if any.
@@ -174,16 +152,16 @@ const callOpenAI: AttemptFn = async (systemPrompt, messages, model) => {
 
 const PROVIDERS: ProviderConfig[] = [
   {
-    name: "gemini",
-    keyEnv: "GEMINI_API_KEY",
-    models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.0-flash"],
-    call: callGemini,
-  },
-  {
     name: "groq",
     keyEnv: "GROQ_API_KEY",
     models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
     call: callGroq,
+  },
+  {
+    name: "gemini",
+    keyEnv: "GEMINI_API_KEY",
+    models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.0-flash"],
+    call: callGemini,
   },
   {
     name: "openai",
@@ -212,6 +190,18 @@ function isRateLimitOrQuotaError(err: unknown): boolean {
   );
 }
 
+const ATTEMPT_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label}: timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 async function runChain(
   systemPrompt: string | undefined,
   messages: ChatMessage[]
@@ -227,7 +217,11 @@ async function runChain(
     for (const model of provider.models) {
       try {
         console.log(`[ai] trying ${provider.name}/${model}...`);
-        const text = await provider.call(systemPrompt, messages, model);
+        const text = await withTimeout(
+          provider.call(systemPrompt, messages, model),
+          ATTEMPT_TIMEOUT_MS,
+          `${provider.name}/${model}`
+        );
         if (text && text.trim().length > 0) {
           console.log(`[ai] ✅ success via ${provider.name}/${model}`);
           return text;
@@ -241,8 +235,8 @@ async function runChain(
 
         // Only bother stepping down to the degraded model on this same
         // provider if it looks like a limit/quota problem. Other errors
-        // (bad key, network) will fail the same way on the smaller model
-        // too, so just move straight to the next provider.
+        // (bad key, network, timeout) will fail the same way on the
+        // smaller model too, so just move straight to the next provider.
         if (!isRateLimitOrQuotaError(err)) {
           console.log(`[ai] → moving to next provider (not a rate-limit error)`);
           break;

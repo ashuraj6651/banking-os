@@ -168,9 +168,17 @@ export function CurrentAffairs() {
                   transition={{ delay: i * 0.05 }}
                 >
                   <GlassCard>
-                    <button
-                      className="w-full p-5 text-left"
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="w-full p-5 text-left cursor-pointer"
                       onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setExpandedId(isExpanded ? null : c.id);
+                        }
+                      }}
                     >
                       <div className="flex items-center gap-2">
                         <span
@@ -206,7 +214,7 @@ export function CurrentAffairs() {
                           Quiz me
                         </button>
                       </div>
-                    </button>
+                    </div>
                   </GlassCard>
                 </motion.div>
               );

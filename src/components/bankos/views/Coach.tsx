@@ -31,13 +31,6 @@ export function Coach() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  function getGreeting() {
-  const hour = new Date().getHours();
-
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-} 
   useEffect(() => {
     fetch("/api/coach")
       .then((res) => res.json())
@@ -48,7 +41,9 @@ export function Coach() {
         setMessages([
           {
             role: "assistant",
-            content: `${getGreeting()}, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?`,},
+            content:
+              "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?",
+          },
         ]);
       })
       .finally(() => setHistoryLoaded(true));

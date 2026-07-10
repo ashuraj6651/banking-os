@@ -18,15 +18,8 @@ Formatting rules (always follow):
 - Keep responses tight and skimmable — avoid long walls of text.
 `;
 
-function getGreeting() {
-  const hour = new Date().getHours();
-
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-const DEFAULT_GREETING = `${getGreeting()}, Ashu. I'm your Mentor. How can I help you today? You can ask me for study tips, mock test advice, or a focused recovery plan based on your recent performance.`;
+const DEFAULT_GREETING =
+  "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?";
 
 // GET /api/coach — return saved chat history for the logged-in profile.
 // If there's no history yet, seed it with the default greeting so the

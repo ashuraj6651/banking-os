@@ -81,7 +81,7 @@ export function Landing() {
       {/* ===== Hero ===== */}
       <section ref={heroRef} className="relative px-4 pt-36 sm:px-6 lg:pt-44">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col items-center text-center">
+          <motion.div style={{ y, opacity }} className="flex flex-col items-center text-center">
             <Reveal>
               <Eyebrow>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -122,7 +122,7 @@ export function Landing() {
                 ))}
               </div>
             </Reveal>
-          </div>
+          </motion.div>
 
           {/* ===== Floating particle dots ===== */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
@@ -165,16 +165,12 @@ export function Landing() {
           </div>
 
           {/* ===== Floating dashboard preview ===== */}
-          {/* ===== Floating dashboard preview ===== */}
-<Reveal delay={0.25} y={40}>
-  <div className="mt-10">
-    <div className="mb-3 text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
-      Product preview · your real data fills in after onboarding
-    </div>
-
-    <HeroPreview />
-  </div>
-</Reveal>
+          <Reveal delay={0.25} y={40}>
+            <div className="mb-3 text-center text-[11px] uppercase tracking-[0.22em] text-white/30">
+              Product preview · your real data fills in after onboarding
+            </div>
+            <HeroPreview />
+          </Reveal>
         </div>
       </section>
 
