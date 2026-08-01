@@ -1,0 +1,162 @@
+"use client";
+import * as React from "react";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+/** Reveal — fade + rise on scroll into view */
+export function Reveal({
+  children,
+  delay = 0,
+  y = 24,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  y?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Eyebrow pill */
+export function Eyebrow({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-white/60 backdrop-blur-md",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Section heading block */
+export function SectionHeading({
+  eyebrow,
+  title,
+  subtitle,
+  align = "center",
+  className,
+}: {
+  eyebrow?: string;
+  title: React.ReactNode;
+  subtitle?: string;
+  align?: "center" | "left";
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-4",
+        align === "center" ? "items-center text-center" : "items-start text-left",
+        className
+      )}
+    >
+      {eyebrow && (
+        <Reveal>
+          <Eyebrow>
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+            {eyebrow}
+          </Eyebrow>
+        </Reveal>
+      )}
+      <Reveal delay={0.05}>
+        <h2 className="max-w-3xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
+          {title}
+        </h2>
+      </Reveal>
+      {subtitle && (
+        <Reveal delay={0.1}>
+          <p className="max-w-2xl text-pretty text-base leading-relaxed text-white/50 sm:text-lg">
+            {subtitle}
+          </p>
+        </Reveal>
+      )}
+    </div>
+  );
+}
+
+/** BankOS wordmark / logo lockup */
+export function Wordmark({
+  className,
+  size = "md",
+}: {
+  className?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const dim = size === "sm" ? "h-9 w-9" : size === "lg" ? "h-14 w-14" : "h-12 w-12";
+  const text =
+    size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
+
+  return (
+    <div className={cn("flex items-center gap-2.5 wordmark-glow", className)}>
+      <div
+        className={cn(
+          "relative grid place-items-center rounded-xl border border-white/10 bg-black shadow-[0_4px_20px_-4px_rgba(0,0,0,0.45)] p-1",
+          dim
+        )}
+      >
+        <img
+          src="/BOlogo.png"
+          alt="BankOS"
+          className="relative max-h-full max-w-full object-contain"
+        />
+      </div>
+      
+      <span className={cn("font-semibold tracking-tight text-white", text)}>
+        Bank<span className="text-violet-400">OS</span>
+      </span>
+    </div>
+  );
+}
+
+/** Premium tag/badge */
+export function GlowBadge({
+  children,
+  color = "violet",
+  animated = false,
+  className,
+}: {
+  children: React.ReactNode;
+  color?: "violet" | "electric" | "cyan" | "amber" | "emerald";
+  animated?: boolean;
+  className?: string;
+}) {
+  const colors: Record<string, string> = {
+    violet: "border-violet-400/30 bg-violet-500/10 text-violet-200",
+    electric: "border-electric-400/30 bg-electric-500/10 text-electric-200",
+    cyan: "border-cyan-400/30 bg-cyan-500/10 text-cyan-200",
+    amber: "border-amber-400/30 bg-amber-500/10 text-amber-200",
+    emerald: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        animated && "animated-border-gradient",
+        colors[color],
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
