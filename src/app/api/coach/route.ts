@@ -7,28 +7,63 @@ export const runtime = "nodejs";
 
 const SYSTEM_PROMPT = `
 You are Mentor, the AI Coach inside BankOS.
-You help banking exam aspirants with practical, concise and helpful advice.
-Reply naturally based on the user's message.
 
-Formatting rules (always follow):
-- Use short paragraphs (1-3 sentences each).
-- Use markdown bullet points or numbered lists for anything with 3+ items — never cram a list into one paragraph.
-- Use **bold** only for genuinely important words, not entire sentences.
-- Use a markdown heading (## or ###) only when the reply covers multiple distinct sections.
-- Keep responses tight and skimmable — avoid long walls of text.
+Your purpose is to help banking exam aspirants prepare efficiently for exams such as SBI PO, IBPS PO, IBPS Clerk, RRB PO and similar competitive banking exams.
+
+Guidelines:
+- Give practical, concise and actionable advice.
+- Explain concepts simply.
+- Break large goals into achievable study plans.
+- Motivate naturally without sounding robotic.
+- Never invent user performance statistics.
+- Never claim you analyzed data unless that data is explicitly provided.
+- If analytics are unavailable, clearly say so instead of guessing.
+
+Formatting:
+- Use short paragraphs.
+- Use markdown bullet points for lists.
+- Use headings only when needed.
+- Avoid long walls of text.
 `;
 
-const DEFAULT_GREETING =
-  "Good evening, Ashu. I'm your Mentor. I've reviewed your week — Reasoning is trending up (+4%), but Quant accuracy dipped on the last mock. Want me to build a focused 3-day Quant recovery plan?";
+function getDefaultGreeting(name?: string) {
+  const hour = new Date().getHours();
+
+  const greeting =
+    hour < 12
+      ? "Good morning"
+      : hour < 17
+      ? "Good afternoon"
+      : "Good evening";
+
+  return `${greeting}${name ? `, ${name}` : ""}. 👋
+
+Welcome back to BankOS.
+
+I'm your AI Mentor, here to help you prepare smarter—not just harder.
+
+I can help you with:
+
+• Quantitative Aptitude
+• Reasoning
+• English
+• General Awareness
+• Mock Test Analysis
+• Daily Study Planning
+
+What would you like to work on today?`;
+}
 
 // GET /api/coach — return saved chat history for the logged-in profile.
 // If there's no history yet, seed it with the default greeting so the
 // UI always has something to render (and persists that greeting too).
 export async function GET() {
   const profile = await getProfile();
+  const defaultGreeting = getDefaultGreeting(profile?.name);
+
   if (!profile) {
     return NextResponse.json({
-      messages: [{ role: "assistant", content: DEFAULT_GREETING }],
+      messages: [{ role: "assistant", content: defaultGreeting }],
     });
   }
 
@@ -39,13 +74,30 @@ export async function GET() {
 
   if (history.length === 0) {
     const seeded = await db.coachMessage.create({
-      data: { profileId: profile.id, role: "assistant", content: DEFAULT_GREETING },
+      data: { profileId: profile.id, role: "assistant", content: defaultGreeting },
     });
     history = [seeded];
+  } else {
+    const firstAssistantMessage = history.find((message) => message.role === "assistant");
+
+    if (
+  firstAssistantMessage &&
+  (
+    firstAssistantMessage.content.includes("Reasoning is trending up") ||
+    firstAssistantMessage.content.includes("Quant accuracy dipped")
+  )
+) {
+      const updatedMessage = await db.coachMessage.update({
+        where: { id: firstAssistantMessage.id },
+        data: { content: defaultGreeting },
+      });
+
+      history = history.map((message) => (message.id === updatedMessage.id ? updatedMessage : message));
+    }
   }
 
   return NextResponse.json({
-    messages: history.map((m) => ({ role: m.role, content: m.content })),
+    messages: history.map((message) => ({ role: message.role, content: message.content })),
   });
 }
 
