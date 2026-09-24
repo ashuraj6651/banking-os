@@ -37,6 +37,7 @@ function textField(item: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
     const value = item[key];
     if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
   }
   return "";
 }
@@ -56,9 +57,8 @@ function normalize(payload: unknown): CurrentAffairItem[] {
     const item = asRecord(value);
     if (!item) return [];
 
-    // Keep the mapper defensive until the provider returns a populated sample.
-    const title = textField(item, ["title", "headline", "name"]);
-    const summary = textField(item, ["summary", "description", "content", "details"]);
+    const title = textField(item, ["title", "headline", "name", "question"]);
+    const summary = textField(item, ["summary", "description", "content", "details", "answer"]);
     if (!title && !summary) return [];
 
     const rawDate = textField(item, ["publishedAt", "published_at", "date", "createdAt", "created_at"]);
@@ -82,7 +82,7 @@ function configError(): string | null {
   return null;
 }
 
-async function fetchRapidApi(): Promise<CurrentAffairItem[]> {
+async function fetchRapidApi(): Promise<{ items: CurrentAffairItem[]; providerCount: number }> {
   const error = configError();
   if (error) throw new Error(error);
 
@@ -102,25 +102,19 @@ async function fetchRapidApi(): Promise<CurrentAffairItem[]> {
     if (response.status === 401 || response.status === 403) {
       throw new Error("RapidAPI authentication failed. Check RAPIDAPI_KEY and RAPIDAPI_HOST.");
     }
-    if (response.status === 429) {
-      throw new Error("RapidAPI quota limit reached. Please try again later.");
-    }
+    if (response.status === 429) throw new Error("RapidAPI quota limit reached. Please try again later.");
     if (!response.ok) throw new Error(`RapidAPI request failed (${response.status}).`);
 
     const payload: unknown = await response.json();
-    const items = normalize(payload);
-    // [] is a valid provider response, not an API error.
-    return items;
+    const providerItems = getItems(payload);
+    return { items: normalize(payload), providerCount: providerItems.length };
   } finally {
     clearTimeout(timeout);
   }
 }
 
 async function databaseFallback(): Promise<CurrentAffairItem[]> {
-  const items = await db.currentAffair.findMany({
-    orderBy: { date: "desc" },
-    take: FALLBACK_ITEMS_LIMIT,
-  });
+  const items = await db.currentAffair.findMany({ orderBy: { date: "desc" }, take: FALLBACK_ITEMS_LIMIT });
   return items.map((item) => ({
     id: item.id,
     tag: item.tag,
@@ -133,26 +127,30 @@ async function databaseFallback(): Promise<CurrentAffairItem[]> {
 
 async function responseForRequest() {
   try {
-    const items = await fetchRapidApi();
-    return NextResponse.json({ items, source: "rapidapi" });
+    const result = await fetchRapidApi();
+    return NextResponse.json({
+      items: result.items,
+      count: result.items.length,
+      providerCount: result.providerCount,
+      source: "rapidapi",
+      empty: result.items.length === 0,
+    });
   } catch (error) {
     const fallback = await databaseFallback();
     if (fallback.length > 0) {
-      return NextResponse.json({ items: fallback, source: "database", stale: true });
+      return NextResponse.json({ items: fallback, count: fallback.length, source: "database", stale: true });
     }
 
     const message = error instanceof Error ? error.message : "Current affairs provider unavailable.";
     const status = message.includes("not configured") ? 503 : message.includes("authentication") ? 502 : message.includes("quota") ? 429 : 503;
-    return NextResponse.json({ error: message, items: [] }, { status });
+    return NextResponse.json({ error: message, items: [], count: 0 }, { status });
   }
 }
 
-// GET /api/current-affairs — server-side RapidAPI proxy.
 export async function GET() {
   return responseForRequest();
 }
 
-// Existing UI uses POST for Refresh; keep that behavior while using the same source.
 export async function POST(_request: NextRequest) {
   return responseForRequest();
 }
