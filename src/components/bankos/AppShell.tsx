@@ -2,7 +2,31 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Sparkles, Layers, Timer, Clock, BarChart3, Globe2, Network, NotebookPen, RefreshCw, User, Settings, Menu, X, Flame, Coins, Command, Search, LogOut, ListTodo, ListChecks, Target } from "lucide-react";
+import {
+  LayoutDashboard,
+  Sparkles,
+  Layers,
+  Timer,
+  Clock,
+  BarChart3,
+  Globe2,
+  Network,
+  NotebookPen,
+  RefreshCw,
+  Newspaper,
+  User,
+  Settings,
+  Menu,
+  X,
+  Flame,
+  Coins,
+  Command,
+  Search,
+  LogOut,
+  ListTodo,
+  ListChecks,
+  Target,
+} from "lucide-react";
 import { useBankOS } from "@/lib/store";
 import { AppView } from "@/lib/data";
 import { useProfileStats, useLogout, useAuth } from "@/lib/hooks";
@@ -20,6 +44,7 @@ import { WorldMap } from "./views/WorldMap";
 import { SkillTree } from "./views/SkillTree";
 import { Notebook } from "./views/Notebook";
 import { Revision } from "./views/Revision";
+import { CurrentAffairs } from "./views/CurrentAffairs";
 import { Profile } from "./views/Profile";
 import { SettingsView } from "./views/SettingsView";
 import { Syllabus } from "./views/Syllabus";
@@ -39,6 +64,7 @@ const NAV: { view: AppView; label: string; icon: typeof LayoutDashboard; group: 
   { view: "analytics", label: "Analytics", icon: BarChart3, group: "Train" },
   { view: "world", label: "World Map", icon: Globe2, group: "Explore" },
   { view: "skills", label: "Skill Tree", icon: Network, group: "Explore" },
+  { view: "current", label: "Current Affairs", icon: Newspaper, group: "Explore" },
   { view: "notebook", label: "Error Notebook", icon: NotebookPen, group: "Refine" },
   { view: "revision", label: "Revision Engine", icon: RefreshCw, group: "Refine" },
   { view: "profile", label: "Profile", icon: User, group: "Account" },
@@ -56,6 +82,7 @@ function ViewRouter() {
     case "analytics": return <Analytics />;
     case "world": return <WorldMap />;
     case "skills": return <SkillTree />;
+    case "current": return <CurrentAffairs />;
     case "syllabus": return <Syllabus />;
     case "timer": return <StudyTimer />;
     case "planner": return <Planner />;
@@ -82,7 +109,7 @@ function UserCard({ profile, email, onLogout, mobile = false }: { profile: any; 
 function Navigation({ profile, email, mobileOpen, setMobileOpen, onLogout }: { profile: any; email?: string; mobileOpen?: boolean; setMobileOpen?: (open: boolean) => void; onLogout: () => void }) {
   const { activeView, setView } = useBankOS();
   const groups = ["Operate", "Train", "Explore", "Refine", "Account"];
-  const content = <nav className="flex-1 overflow-y-auto scrollbar-premium pb-6">{groups.map((group) => <div key={group}><NavGroup label={group} />{NAV.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activeView === item.view; return <button key={item.view} onClick={() => { setView(item.view); setMobileOpen?.(false); }} className={cn("group relative mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200", active ? "bg-gradient-to-r from-violet-500/20 to-transparent text-white" : "text-white/55 hover:bg-white/5 hover:text-white/90")}>{active && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-violet-400 to-electric-400" />}<Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", active ? "text-violet-300" : "text-white/40 group-hover:text-white/70")} /><span className="font-medium tracking-tight">{item.label}</span></button>; })}</div>)}</nav>;
+  const content = <nav className="flex-1 overflow-y-auto scrollbar-premium pb-6">{groups.map((group) => <div key={group}><NavGroup label={group} />{NAV.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = activeView === item.view; return <button key={item.view} onClick={() => { setView(item.view); setMobileOpen?.(false); }} className={cn("group relative mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200", active ? "bg-gradient-to-r from-violet-500/20 to-transparent text-white" : "text-white/55 hover:bg-white/5 hover:text-white/90")}>{active && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-violet-400 to-electric-400" /> }<Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", active ? "text-violet-300" : "text-white/40 group-hover:text-white/70")} /><span className="font-medium tracking-tight">{item.label}</span></button>; })}</div> )}</nav>;
   return <>
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-white/[0.06] bg-[#070b16]/80 backdrop-blur-2xl lg:flex"><div className="flex h-16 items-center px-5"><Wordmark /></div>{content}<UserCard profile={profile} email={email} onLogout={onLogout} /></aside>
     <AnimatePresence>{mobileOpen && <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileOpen?.(false)} className="fixed inset-0 z-50 bg-black/60 lg:hidden" /><motion.aside initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", stiffness: 360, damping: 36 }} className="fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-[#070b16] md:w-[320px] lg:hidden"><div className="flex h-14 items-center justify-between px-4"><Wordmark /><button onClick={() => setMobileOpen?.(false)} className="grid h-8 w-8 place-items-center rounded-lg text-white/60"><X className="h-5 w-5" /></button></div>{content}<UserCard profile={profile} email={email} onLogout={onLogout} mobile /></motion.aside></>}</AnimatePresence>
