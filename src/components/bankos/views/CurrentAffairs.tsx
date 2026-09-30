@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Newspaper, ChevronRight, Loader2, RefreshCw, BookOpen, Clock, TrendingUp, Sparkles } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
 import { useCurrentAffairs } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { useBankOS } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -19,57 +20,56 @@ const TAG_COLOR: Record<string, string> = {
 
 export function CurrentAffairs() {
   const { data, isLoading, refetch } = useCurrentAffairs();
+  const queryClient = useQueryClient();
   const { setView } = useBankOS();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const automaticRefreshStarted = useRef(false);
   const items = data?.items ?? [];
 
-  async function handleRefresh() {
-  setIsRefreshing(true);
+  const handleRefresh = useCallback(async (automatic = false) => {
+    setIsRefreshing(true);
 
-  try {
-    const res = await fetch("/api/current-affairs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
+    try {
+      const res = await fetch("/api/current-affairs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const result = await res.json().catch(() => ({}));
 
-    const result = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(
-        result.error || `Failed to refresh (${res.status})`
-      );
-    }
-
-    if (result.source === "provider") {
-      if (result.newCount > 0) {
-        toast.success(
-          `Refreshed! ${result.newCount} current affairs loaded.`
-        );
-      } else {
-        toast.info(
-          "The current affairs provider returned no articles right now."
-        );
+      if (!res.ok) {
+        if (automatic && res.status === 429) {
+          toast.info("Today’s news-refresh limit is used up. Showing saved headlines and quiz questions.");
+          return;
+        }
+        throw new Error(result.error || `Failed to refresh (${res.status})`);
       }
-    } else if (result.source === "database") {
-      toast.info("Showing saved current affairs.");
+
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["questions"] });
+
+      if (result.source === "provider" && result.newCount > 0) {
+        toast.success(`${result.newCount} current-affairs articles refreshed; quiz updated without AI tokens.`);
+      } else if (result.source === "provider") {
+        toast.info("The news provider has no newer articles right now. Saved quiz questions are ready.");
+      } else if (result.source === "database") {
+        toast.info("News provider unavailable. Using saved articles and quiz questions.");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to refresh current affairs";
+      if (automatic) toast.info(`Could not fetch newer news. Showing saved articles and quiz questions. ${msg}`);
+      else toast.error(msg);
+    } finally {
+      setIsRefreshing(false);
     }
+  }, [queryClient, refetch]);
 
-    await refetch();
-  } catch (err) {
-    const msg =
-      err instanceof Error
-        ? err.message
-        : "Failed to refresh current affairs";
-
-    toast.error(msg);
-  } finally {
-    setIsRefreshing(false);
-  }
-}
+  useEffect(() => {
+    if (isLoading || automaticRefreshStarted.current) return;
+    automaticRefreshStarted.current = true;
+    void handleRefresh(true);
+  }, [handleRefresh, isLoading]);
 
   function handleTakeQuiz() {
     // Navigate to Practice with Current Affairs filter pre-selected
@@ -93,7 +93,7 @@ export function CurrentAffairs() {
   badge="Daily"
   badgeIcon={<Newspaper className="h-3 w-3" />}
   title="Current Affairs"
-  subtitle="Banking, RBI, economy and government schemes — updated regularly."
+  subtitle="Articles and quiz questions update when you open this page. News API quota applies; quiz generation uses no AI tokens."
   actions={
     <div className="flex flex-col items-end gap-1">
       <span className="text-xs font-semibold text-white/50">

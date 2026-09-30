@@ -167,6 +167,36 @@ export async function GET(req: NextRequest) {
   const topicKey = topic || "All";
   const cacheKey = getCacheKey(profile.id, subjectKey, diffKey) + `:${topicKey}`;
 
+  // Current-affairs quiz items are derived from saved news summaries by the
+  // news refresh route. Serve those stored questions directly; never invoke AI
+  // generation for this subject.
+  if (subjectKey === "Current Affairs") {
+    const where = {
+      subject: "Current Affairs",
+      ...(diffKey !== "All" ? { difficulty: diffKey } : {}),
+      ...(topic ? { topic } : {}),
+    };
+    const bank = await db.question.findMany({
+      where,
+      take: 200,
+      orderBy: { createdAt: "desc" },
+    });
+    const attemptedIds = await db.attempt.findMany({
+      where: { profileId: profile.id },
+      select: { questionId: true },
+      distinct: ["questionId"],
+    });
+    const attempted = new Set(attemptedIds.map((item) => item.questionId));
+    const unseen = bank.filter((question) => !attempted.has(question.id));
+    const pool = unseen.length > 0 ? unseen : bank;
+    const questions = [...pool]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.max(1, Math.min(50, limit)))
+      .map((question) => ({ ...question, options: JSON.parse(question.options) }));
+
+    return NextResponse.json({ questions, generatedWithAI: false });
+  }
+
   // Check cache (unless refresh is requested)
   if (!refresh) {
     const cached = questionCache.get(cacheKey);

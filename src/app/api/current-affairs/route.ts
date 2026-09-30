@@ -627,6 +627,44 @@ async function loadCurrentAffairs(): Promise<{
   };
 }
 
+// Build a small, factual headline-matching quiz from saved article summaries.
+// This deliberately uses no language model, so refreshes consume provider quota
+// only and never AI tokens.
+async function saveArticleQuizQuestions(articles: NormalizedAffair[]) {
+  const usable = articles.filter((article) => article.title.trim() && article.summary.trim());
+  if (usable.length < 4) return 0;
+
+  const created = await Promise.all(usable.map(async (article, index) => {
+    const questionText = `Which headline matches this current-affairs report?\n\n${article.summary.slice(0, 900)}`;
+    const existing = await db.question.findFirst({ where: { text: questionText } });
+    if (existing) return false;
+
+    const otherHeadlines = usable
+      .filter((_, otherIndex) => otherIndex !== index)
+      .map((item) => item.title)
+      .filter((title, titleIndex, all) => all.indexOf(title) === titleIndex);
+    const distractors = otherHeadlines.sort(() => Math.random() - 0.5).slice(0, 3);
+    if (distractors.length < 3) return false;
+
+    const options = [article.title, ...distractors].sort(() => Math.random() - 0.5);
+    const answer = options.indexOf(article.title);
+    await db.question.create({
+      data: {
+        subject: "Current Affairs",
+        topic: article.tag || "Current Affairs",
+        difficulty: "Medium",
+        text: questionText,
+        options: JSON.stringify(options),
+        answer,
+        explanation: `${article.title}. ${article.summary}`,
+      },
+    });
+    return true;
+  }));
+
+  return created.filter(Boolean).length;
+}
+
 /**
  * GET /api/current-affairs
  *
@@ -800,6 +838,7 @@ export async function POST() {
   });
 
   const result = await loadCurrentAffairs();
+  let quizQuestionsCreated = 0;
   if (result.data.source === "provider") {
   for (const item of result.data.items) {
     const date = new Date(item.date);
@@ -830,9 +869,13 @@ export async function POST() {
           imageUrl: item.imageUrl,
         },
       });
+      }
     }
   }
-}
+
+  if (result.data.items.length > 0 && result.data.source !== "error") {
+    quizQuestionsCreated = await saveArticleQuizQuestions(result.data.items);
+  }
 
   const usedAfter = used + 1;
 
@@ -847,6 +890,7 @@ export async function POST() {
       refreshLimit: DAILY_LIMIT,
       refreshesUsed: usedAfter,
       refreshesRemaining: DAILY_LIMIT - usedAfter,
+      quizQuestionsCreated,
     },
     {
       status: result.status,
