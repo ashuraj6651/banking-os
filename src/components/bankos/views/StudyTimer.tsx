@@ -47,22 +47,36 @@ const DEFAULT_DURATIONS: TimerDurations = {
   longBreak: LONG_BREAK_MINUTES,
 };
 
+function userDefaultDurations(): TimerDurations {
+  if (typeof window === "undefined") return DEFAULT_DURATIONS;
+  try {
+    const preferredFocus = localStorage.getItem("bankos_setting_focusTimer");
+    return {
+      ...DEFAULT_DURATIONS,
+      focus: clampMinutes(preferredFocus, DEFAULT_DURATIONS.focus),
+    };
+  } catch {
+    return DEFAULT_DURATIONS;
+  }
+}
+
 function loadDurations(): TimerDurations {
   if (typeof window === "undefined") return DEFAULT_DURATIONS;
   try {
+    const userDefaults = userDefaultDurations();
     const raw = localStorage.getItem(DURATIONS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<TimerDurations>;
       return {
-        focus: clampMinutes(parsed.focus, DEFAULT_DURATIONS.focus),
-        shortBreak: clampMinutes(parsed.shortBreak, DEFAULT_DURATIONS.shortBreak),
-        longBreak: clampMinutes(parsed.longBreak, DEFAULT_DURATIONS.longBreak),
+        focus: clampMinutes(parsed.focus, userDefaults.focus),
+        shortBreak: clampMinutes(parsed.shortBreak, userDefaults.shortBreak),
+        longBreak: clampMinutes(parsed.longBreak, userDefaults.longBreak),
       };
     }
   } catch {
     // ignore
   }
-  return DEFAULT_DURATIONS;
+  return userDefaultDurations();
 }
 
 function saveDurations(durations: TimerDurations) {
@@ -586,7 +600,7 @@ export function StudyTimer() {
                 </div>
                 <div className="mt-4 flex items-center justify-end gap-2">
                   <button
-                    onClick={() => setDurationDraft(DEFAULT_DURATIONS)}
+                    onClick={() => setDurationDraft(userDefaultDurations())}
                     className="rounded-xl px-3 py-2 text-xs text-white/40 hover:text-white/70"
                   >
                     Reset to defaults

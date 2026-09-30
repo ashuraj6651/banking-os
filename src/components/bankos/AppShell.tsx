@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   LayoutDashboard,
   Sparkles,
@@ -51,6 +51,7 @@ import { Syllabus } from "./views/Syllabus";
 import { StudyTimer } from "./views/StudyTimer";
 import { Planner } from "./views/Planner";
 import { DailyChallenge } from "./views/DailyChallenge";
+import { SettingsRuntime } from "./SettingsRuntime";
 
 const NAV: {
   view: AppView;
@@ -291,6 +292,13 @@ export function AppShell() {
   const { data: authData } = useAuth();
   const logout = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("bankos_setting_reduceMotion") ?? "false") as boolean;
+    } catch {
+      return false;
+    }
+  });
 
   const isCoachView = activeView === "coach";
   const profile = stats?.profile;
@@ -301,18 +309,32 @@ export function AppShell() {
     return () => window.removeEventListener("bankos:close-overlays", close);
   }, []);
 
+  useEffect(() => {
+    const syncMotionPreference = () => {
+      try {
+        setReduceMotion(JSON.parse(localStorage.getItem("bankos_setting_reduceMotion") ?? "false") as boolean);
+      } catch {
+        setReduceMotion(false);
+      }
+    };
+    window.addEventListener("bankos:settings-change", syncMotionPreference);
+    return () => window.removeEventListener("bankos:settings-change", syncMotionPreference);
+  }, []);
+
   function handleLogout() {
     logout.mutate();
     exitToLanding();
   }
 
   return (
+    <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
     <div
       className={cn(
         "relative min-h-screen",
         isCoachView && "lg:h-screen lg:min-h-0 lg:overflow-hidden",
       )}
     >
+      <SettingsRuntime />
       <Navigation
         profile={profile}
         email={authData?.account?.email}
@@ -343,7 +365,7 @@ export function AppShell() {
         <div className="flex items-center gap-1.5">
           <Coins className="h-4 w-4 text-violet-300" />
           <span className="text-sm font-semibold text-violet-200">
-            {(profile?.coins ?? 0).toLocaleString()}
+            {Math.min(100000, Math.max(0, profile?.coins ?? 0)).toLocaleString()}
           </span>
         </div>
         <div className="h-4 w-px bg-white/10" />
@@ -385,6 +407,7 @@ export function AppShell() {
       <CommandPalette />
       <AnimatePresence>{focusMode && <FocusMode />}</AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
 
@@ -435,7 +458,7 @@ function Topbar() {
         <div className="flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2">
           <Coins className="h-4 w-4 text-violet-300" />
           <span className="text-sm font-semibold text-violet-200">
-            {(profile?.coins ?? 0).toLocaleString()}
+            {Math.min(100000, Math.max(0, profile?.coins ?? 0)).toLocaleString()}
           </span>
         </div>
       </div>

@@ -30,7 +30,6 @@ export async function GET() {
     exportedAt: new Date().toISOString(),
     profile: {
       name: profile.name,
-      avatarUrl: profile.avatarUrl ?? null,
       exam: profile.exam,
       targetDate: profile.targetDate.toISOString(),
       studyHoursPerDay: profile.studyHoursPerDay,
@@ -38,7 +37,6 @@ export async function GET() {
       streak: profile.streak,
       level: profile.level,
       xp: profile.xp,
-      coins: profile.coins,
       roadmap: profile.roadmap,
     },
     missions: missions.map((m) => ({

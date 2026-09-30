@@ -23,9 +23,6 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.name === "string") {
       data.name = body.name.trim();
     }
-    if (typeof body.avatarUrl === "string") {
-      data.avatarUrl = body.avatarUrl.trim() || null;
-    }
     if (typeof body.exam === "string") {
       data.exam = body.exam.trim();
     }

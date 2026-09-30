@@ -112,8 +112,15 @@ export async function POST(req: NextRequest) {
 
   // XP + streak (combined into one profile fetch + one profile update
   // instead of the old 6 separate DB round trips)
-  const updatedProfile = await applyAttemptRewards(profile.id, correct);
+  const updatedProfile = await applyAttemptRewards(profile.id, correct, attempt.id);
   await checkAchievements(profile.id, updatedProfile);
 
-  return NextResponse.json({ attempt, correct, answer: question.answer, explanation: question.explanation });
+  return NextResponse.json({
+    attempt,
+    correct,
+    answer: question.answer,
+    explanation: question.explanation,
+    coinsAwarded: updatedProfile?.coinsAwarded ?? 0,
+    coinBalance: updatedProfile?.coins,
+  });
 }

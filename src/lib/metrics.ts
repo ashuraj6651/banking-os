@@ -1,6 +1,7 @@
 // BankOS — server-side metric computations from real attempt data
 import { db } from "./db";
 import { getAccount } from "./auth";
+import { addCoins, COIN_REWARDS } from "./coins";
 
 export type Readiness = {
   overall: number;
@@ -336,14 +337,13 @@ export async function touchStreak(profileId: string) {
  * DB round trips (this is what was causing the 5-6s delay on answer submit).
  * Behavior is identical to calling awardXp() then touchStreak().
  */
-export async function applyAttemptRewards(profileId: string, correct: boolean) {
+export async function applyAttemptRewards(profileId: string, correct: boolean, attemptId: string) {
   const profile = await db.profile.findUnique({ where: { id: profileId } });
   if (!profile) return null;
 
   const xp = correct ? 10 : 3;
   const newXp = profile.xp + xp;
   const newLevel = Math.floor(newXp / 1000) + 1;
-  const newCoins = profile.coins + Math.floor(xp / 2);
 
   const now = new Date();
   const today = new Date(now);
@@ -371,30 +371,38 @@ export async function applyAttemptRewards(profileId: string, correct: boolean) {
     }
   }
 
-  return db.profile.update({
+  const updated = await db.profile.update({
     where: { id: profileId },
     data: {
       xp: newXp,
       level: newLevel,
-      coins: newCoins,
       streak: newStreak,
       lastActiveDate: newLastActiveDate,
     },
   });
+  const reward = await addCoins(
+    profileId,
+    correct ? COIN_REWARDS.CORRECT_ANSWER : COIN_REWARDS.WRONG_ANSWER,
+    `attempt:${attemptId}`,
+  );
+  return { ...updated, coins: reward.balance, coinsAwarded: reward.awarded };
 }
 
 /**
  * Award XP and check achievements.
  */
-export async function awardXp(profileId: string, xp: number) {
+export async function awardXp(profileId: string, xp: number, eventKey: string) {
+  const reward = await addCoins(profileId, Math.floor(xp / 2), eventKey);
+  if (reward.alreadyAwarded) return null;
   const profile = await db.profile.findUnique({ where: { id: profileId } });
   if (!profile) return;
   const newXp = profile.xp + xp;
   const newLevel = Math.floor(newXp / 1000) + 1;
   await db.profile.update({
     where: { id: profileId },
-    data: { xp: newXp, level: newLevel, coins: profile.coins + Math.floor(xp / 2) },
+    data: { xp: newXp, level: newLevel },
   });
+  return { coinsAwarded: reward.awarded, coinBalance: reward.balance };
 }
 
 const ACHIEVEMENT_DEFS: { key: string; check: (s: AchievementStats) => boolean }[] = [

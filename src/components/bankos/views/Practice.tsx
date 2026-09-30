@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Layers, Bookmark, BookmarkCheck, Filter, Check, ChevronRight, Infinity as Inf, Loader2, RefreshCw } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard } from "../GlassCard";
-import { useQuestions, useSubmitAttempt } from "@/lib/hooks";
+import { useProfileStats, useQuestions, useSubmitAttempt } from "@/lib/hooks";
 import { useBankOS } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -16,7 +16,15 @@ const DIFFS = ["All", "Easy", "Medium", "Hard"] as const;
 export function Practice() {
   const { startSession } = useBankOS();
   const [subject, setSubject] = useState<(typeof SUBJECTS)[number]>("All");
-  const [diff, setDiff] = useState<(typeof DIFFS)[number]>("All");
+  const [diff, setDiff] = useState<(typeof DIFFS)[number]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("bankos_setting_defaultDifficulty") ?? '"mixed"') as string;
+      const mapped = saved === "mixed" ? "All" : saved.charAt(0).toUpperCase() + saved.slice(1);
+      return DIFFS.includes(mapped as (typeof DIFFS)[number]) ? mapped as (typeof DIFFS)[number] : "All";
+    } catch {
+      return "All";
+    }
+  });
   const [topic, setTopic] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<string>>(() => {
     // Restore bookmarks from localStorage
@@ -31,6 +39,14 @@ export function Practice() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const submit = useSubmitAttempt();
+  const { data: profileStats } = useProfileStats();
+  const dailyGoal = (() => {
+    try {
+      return Number(localStorage.getItem("bankos_setting_dailyGoal") ?? 50) || 50;
+    } catch {
+      return 50;
+    }
+  })();
 
   // Read filter preference from localStorage (set by CurrentAffairs "Take Quiz"
   // or the Skill Tree's "practice this topic" action)
@@ -109,6 +125,9 @@ export function Practice() {
     submit.mutate(
       { questionId: qId, selected: idx, context: "practice" },
       {
+        onSuccess: (result) => {
+          if (result.coinsAwarded > 0) toast.success(`+${result.coinsAwarded} coin${result.coinsAwarded === 1 ? "" : "s"}`);
+        },
         onError: () => {
           toast.error("Progress not saved — check your connection");
         },
@@ -142,6 +161,16 @@ export function Practice() {
           </div>
         }
       />
+
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3">
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="font-medium text-white/65">Today’s question goal</span>
+          <span className="tabular-nums text-white/55">{Math.min(profileStats?.stats?.dailyAttempts ?? 0, dailyGoal)} / {dailyGoal}</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-violet-400 transition-[width]" style={{ width: `${Math.min(100, ((profileStats?.stats?.dailyAttempts ?? 0) / dailyGoal) * 100)}%` }} />
+        </div>
+      </div>
 
       {/* Filters */}
       <GlassCard hover={false}>

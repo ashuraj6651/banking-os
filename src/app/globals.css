@@ -154,6 +154,44 @@
   filter: blur(60px);
 }
 
+/* User-selectable BankOS appearance settings. */
+html[data-bankos-theme="Midnight"] body {
+  background-color: #02040a;
+}
+html[data-bankos-theme="Midnight"] aside,
+html[data-bankos-theme="Midnight"] header {
+  background-color: rgb(2 4 10 / 92%) !important;
+}
+html[data-bankos-theme="Aurora"] body {
+  background-color: #070b16;
+  background-image:
+    radial-gradient(ellipse 60% 55% at 15% 10%, color-mix(in srgb, var(--bankos-accent) 13%, transparent), transparent 72%),
+    radial-gradient(ellipse 50% 45% at 85% 85%, rgb(6 182 212 / 8%), transparent 72%);
+}
+html[data-bankos-accent] .text-violet-200,
+html[data-bankos-accent] .text-violet-300,
+html[data-bankos-accent] .text-violet-400 {
+  color: var(--bankos-accent) !important;
+}
+html[data-bankos-accent] .bg-violet-500\/10 {
+  background-color: color-mix(in srgb, var(--bankos-accent) 12%, transparent) !important;
+}
+html[data-bankos-accent] .border-violet-400\/20,
+html[data-bankos-accent] .border-violet-400\/30,
+html[data-bankos-accent] .border-violet-300,
+html[data-bankos-accent] .border-violet-300\/70 {
+  border-color: color-mix(in srgb, var(--bankos-accent) 55%, transparent) !important;
+}
+html[data-bankos-reduce-motion="true"],
+html[data-bankos-reduce-motion="true"] *,
+html[data-bankos-reduce-motion="true"] *::before,
+html[data-bankos-reduce-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
 /* Glass card */
 .glass-card {
   background: rgba(255, 255, 255, 0.02);

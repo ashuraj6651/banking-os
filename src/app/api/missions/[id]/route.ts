@@ -24,7 +24,7 @@ export async function PATCH(
   });
 
   if (updated.done) {
-    await awardXp(profile.id, 50);
+    await awardXp(profile.id, 50, `mission:${id}`);
   }
   await checkAchievements(profile.id);
 

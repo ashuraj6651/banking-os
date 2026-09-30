@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       where: { id: mockId },
       data: { status: "completed", score },
     });
-    await awardXp(profile.id, 100);
+    await awardXp(profile.id, 100, `mock:${mockId}`);
     await checkAchievements(profile.id);
     return NextResponse.json({ mock: updated });
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getProfile, ensureTodayMissions } from "@/lib/metrics";
+import { MAX_COINS } from "@/lib/coins";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,7 +39,9 @@ export async function POST(req: NextRequest) {
       where: { id: profile.id },
       data: {
         name: backup.profile.name,
-        avatarUrl: backup.profile.avatarUrl ?? null,
+        // Avatar ownership lives on the server and is intentionally not
+        // overwritten by an editable backup JSON file.
+        avatarUrl: profile.avatarUrl,
         exam: backup.profile.exam,
         targetDate: new Date(backup.profile.targetDate),
         studyHoursPerDay: backup.profile.studyHoursPerDay ?? 4,
@@ -46,7 +49,9 @@ export async function POST(req: NextRequest) {
         streak: backup.profile.streak ?? 0,
         level: backup.profile.level ?? 1,
         xp: backup.profile.xp ?? 0,
-        coins: backup.profile.coins ?? 0,
+        // Coins are account-owned server state. A JSON backup is user-editable,
+        // so importing it must not create or overwrite spendable currency.
+        coins: Math.min(MAX_COINS, Math.max(0, profile.coins)),
         roadmap: backup.profile.roadmap ?? "",
       },
     });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { AvatarId } from "@/lib/avatars";
 
 async function jfetch<T>(url: string, opts?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs = 30000, ...rest } = opts ?? {};
@@ -58,6 +59,15 @@ export type Profile = {
   coins: number;
   roadmap: string;
   createdAt: string;
+};
+
+export type AvatarStoreItem = {
+  id: AvatarId;
+  name: string;
+  url: string;
+  price: number;
+  unlocked: boolean;
+  selected: boolean;
 };
 
 export type Mission = {
@@ -118,7 +128,6 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (body: {
       name?: string;
-      avatarUrl?: string | null;
       exam?: string;
       goal?: string;
       roadmap?: string;
@@ -127,6 +136,51 @@ export function useUpdateProfile() {
       body: JSON.stringify(body),
     }),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profile-stats"] });
+    },
+  });
+}
+
+export function useAvatarStore() {
+  return useQuery({
+    queryKey: ["avatar-store"],
+    queryFn: () => jfetch<{
+      coins: number;
+      selectedAvatarId: AvatarId | null;
+      avatars: AvatarStoreItem[];
+    }>("/api/avatars"),
+  });
+}
+
+export function useUnlockAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (avatarId: AvatarId) => jfetch<{
+      coins: number;
+      avatar: AvatarStoreItem;
+      alreadyOwned: boolean;
+    }>("/api/avatars", {
+      method: "POST",
+      body: JSON.stringify({ avatarId }),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["avatar-store"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["profile-stats"] });
+    },
+  });
+}
+
+export function useSelectAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (avatarId: AvatarId) => jfetch<{ selectedAvatarId: AvatarId }>(
+      "/api/avatars/select",
+      { method: "POST", body: JSON.stringify({ avatarId }) },
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["avatar-store"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
     },
@@ -142,6 +196,7 @@ export function useProfileStats() {
         profile?: Profile;
         stats?: {
           attempts: number;
+          dailyAttempts: number;
           correct: number;
           accuracy: number;
           sessions: number;
@@ -188,6 +243,7 @@ export function useToggleMission() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["missions"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }
@@ -324,6 +380,8 @@ export function useSubmitAttempt() {
         correct: boolean;
         answer: number;
         explanation: string;
+        coinsAwarded: number;
+        coinBalance: number;
       }>("/api/attempts", {
         method: "POST",
         body: JSON.stringify(body),
@@ -333,6 +391,7 @@ export function useSubmitAttempt() {
       qc.invalidateQueries({ queryKey: ["errors"] });
       qc.invalidateQueries({ queryKey: ["revision"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["skilltree"] });
       qc.invalidateQueries({ queryKey: ["world"] });
       qc.invalidateQueries({ queryKey: ["readiness"] });
@@ -366,6 +425,7 @@ export function useEndSession() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["missions"] });
     },
   });
@@ -567,6 +627,7 @@ export function useCompleteMock() {
       qc.invalidateQueries({ queryKey: ["mocks"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }
