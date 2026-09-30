@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateChatReply, hasAnyAIProvider } from "@/lib/ai";
+import {
+  generateChatReply,
+  hasAnyAIProvider,
+  isLocalOllamaMode,
+} from "@/lib/ai";
 import { db } from "@/lib/db";
 import { getProfile } from "@/lib/metrics";
 
@@ -105,6 +109,7 @@ export async function GET() {
       weeklyLimit: WEEKLY_CHAT_LIMIT,
       usedThisWeek: 0,
       remainingThisWeek: WEEKLY_CHAT_LIMIT,
+      isUnlimited: isLocalOllamaMode(),
     });
   }
 
@@ -158,6 +163,7 @@ export async function GET() {
     weeklyLimit: WEEKLY_CHAT_LIMIT,
     usedThisWeek,
     remainingThisWeek: Math.max(0, WEEKLY_CHAT_LIMIT - usedThisWeek),
+    isUnlimited: isLocalOllamaMode(),
   });
 }
 
@@ -196,7 +202,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "No AI provider configured. Add GROQ_API_KEY or GEMINI_API_KEY to .env.",
+            "Ollama is unavailable locally. Start Ollama and pull the configured model. On Vercel, add GROQ_API_KEY or GEMINI_API_KEY.",
         },
         { status: 500 },
       );
@@ -208,7 +214,7 @@ export async function POST(req: NextRequest) {
     if (profile) {
       usedThisWeek = await getWeeklyUsage(profile.id);
 
-      if (usedThisWeek >= WEEKLY_CHAT_LIMIT) {
+      if (!isLocalOllamaMode() && usedThisWeek >= WEEKLY_CHAT_LIMIT) {
         return NextResponse.json(
           {
             error: "You've used all 20 AI Coach chats for this week.",
@@ -258,6 +264,7 @@ export async function POST(req: NextRequest) {
       weeklyLimit: WEEKLY_CHAT_LIMIT,
       usedThisWeek: usedAfter,
       remainingThisWeek: Math.max(0, WEEKLY_CHAT_LIMIT - usedAfter),
+      isUnlimited: isLocalOllamaMode(),
     });
   } catch (error) {
     console.error("AI Coach error:", error);

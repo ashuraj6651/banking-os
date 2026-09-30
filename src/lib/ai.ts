@@ -14,7 +14,8 @@ type AttemptFn = (
 
 interface ProviderConfig {
   name: string;
-  keyEnv: string;
+  keyEnv?: string;
+  enabled?: () => boolean;
   models: string[];
   call: AttemptFn;
 }
@@ -170,7 +171,51 @@ const callOpenAI: AttemptFn = async (systemPrompt, messages, model) => {
   return choice?.message?.content?.toString?.() ?? "";
 };
 
+// Ollama runs on the developer's own machine. Keep it out of production so
+// Vercel always uses the configured hosted providers (Gemini/Groq).
+export const isLocalOllamaMode = () => process.env.NODE_ENV !== "production";
+const isLocalOllamaEnabled = isLocalOllamaMode;
+
+const callOllama: AttemptFn = async (systemPrompt, messages, model) => {
+  const baseUrl = (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434")
+    .replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      messages: [
+        ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+        ...messages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content,
+        })),
+      ],
+      options: { temperature: 0.35, num_predict: MAX_OUTPUT_TOKENS },
+    }),
+    signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Ollama request failed (${response.status}): ${await response.text()}`,
+    );
+  }
+
+  const payload = await response.json();
+  return typeof payload?.message?.content === "string"
+    ? payload.message.content
+    : "";
+};
+
 const PROVIDERS: ProviderConfig[] = [
+  {
+    name: "ollama-local",
+    enabled: isLocalOllamaEnabled,
+    models: [process.env.OLLAMA_MODEL || "llama3.2:3b"],
+    call: callOllama,
+  },
   {
     name: "groq",
     keyEnv: "GROQ_API_KEY",
@@ -192,7 +237,13 @@ const PROVIDERS: ProviderConfig[] = [
 ];
 
 export function hasAnyAIProvider(): boolean {
-  return PROVIDERS.some((provider) => !!process.env[provider.keyEnv]);
+  const activeProviders = isLocalOllamaMode()
+    ? PROVIDERS.filter((provider) => provider.name === "ollama-local")
+    : PROVIDERS.filter((provider) => provider.name !== "ollama-local");
+
+  return activeProviders.some((provider) =>
+    provider.enabled ? provider.enabled() : !!provider.keyEnv && !!process.env[provider.keyEnv],
+  );
 }
 
 function isRetryableProviderError(error: unknown): boolean {
@@ -249,9 +300,15 @@ async function runChain(
   messages: ChatMessage[],
 ): Promise<string> {
   const errors: string[] = [];
+  const activeProviders = isLocalOllamaMode()
+    ? PROVIDERS.filter((provider) => provider.name === "ollama-local")
+    : PROVIDERS.filter((provider) => provider.name !== "ollama-local");
 
-  for (const provider of PROVIDERS) {
-    if (!process.env[provider.keyEnv]) continue;
+  for (const provider of activeProviders) {
+    const configured = provider.enabled
+      ? provider.enabled()
+      : !!provider.keyEnv && !!process.env[provider.keyEnv];
+    if (!configured) continue;
 
     for (const model of provider.models) {
       try {
@@ -301,7 +358,9 @@ export async function testAllProviders(): Promise<
   }[] = [];
 
   for (const provider of PROVIDERS) {
-    const configured = !!process.env[provider.keyEnv];
+    const configured = provider.enabled
+      ? provider.enabled()
+      : !!provider.keyEnv && !!process.env[provider.keyEnv];
 
     if (!configured) {
       results.push({

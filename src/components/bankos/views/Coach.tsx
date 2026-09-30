@@ -25,12 +25,14 @@ type Usage = {
   weeklyLimit: number;
   usedThisWeek: number;
   remainingThisWeek: number;
+  isUnlimited: boolean;
 };
 
 const DEFAULT_USAGE: Usage = {
   weeklyLimit: 20,
   usedThisWeek: 0,
   remainingThisWeek: 20,
+  isUnlimited: false,
 };
 
 const QUICK = [
@@ -84,6 +86,7 @@ function readUsage(data: unknown, fallback: Usage = DEFAULT_USAGE): Usage {
     weeklyLimit: limit,
     usedThisWeek: used,
     remainingThisWeek: remaining,
+    isUnlimited: value.isUnlimited === true,
   };
 }
 
@@ -99,7 +102,7 @@ export function Coach() {
   const [usage, setUsage] = useState<Usage>(DEFAULT_USAGE);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const quotaReached = usage.remainingThisWeek <= 0;
+  const quotaReached = !usage.isUnlimited && usage.remainingThisWeek <= 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -248,11 +251,11 @@ export function Coach() {
         actions={
           <div className="flex items-center gap-2">
             <div
-              title="Weekly limit resets Monday at midnight IST"
+              title={usage.isUnlimited ? "Local Ollama mode has no app chat cap" : "Weekly limit resets Monday at midnight IST"}
               className="flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-500/[0.08] px-3 py-2"
             >
               <span className="hidden text-xs text-white/55 sm:inline">
-                Chats left this week
+                {usage.isUnlimited ? "Local Ollama" : "Chats left this week"}
               </span>
               <span
                 className={cn(
@@ -261,7 +264,9 @@ export function Coach() {
                 )}
               >
                 {historyLoaded
-                  ? `${usage.remainingThisWeek}/${usage.weeklyLimit}`
+                  ? usage.isUnlimited
+                    ? "Unlimited"
+                    : `${usage.remainingThisWeek}/${usage.weeklyLimit}`
                   : "…"}
               </span>
             </div>
