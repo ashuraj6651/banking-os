@@ -2,6 +2,13 @@
 // BankOS — Complete Banking Exam Syllabus
 // Every topic across every section. Nothing skipped.
 // Used to power the Syllabus checklist view.
+//
+// UPDATE: Added SBI PO specific sections —
+//   • English Language  → "Descriptive English (Mains)"
+//   • Computer Awareness → "Computer Aptitude (Mains)"
+//   • Banking & Financial Awareness → "Economy Basics (Mains)"
+//   • Interview Preparation → "Group Exercise (Phase 3)",
+//                             "Psychometric Test (Phase 3)"
 // ============================================================
 
 export type SyllabusGroup = {
@@ -392,6 +399,26 @@ export const SYLLABUS: SyllabusSubject[] = [
           "Vocabulary Based Fillers",
         ],
       },
+      // ---------- NEW: SBI PO Mains Descriptive Test ----------
+      {
+        name: "Descriptive English (Mains)",
+        topics: [
+          "Formal Letter Writing (Format & Structure)",
+          "Letter to Editor",
+          "Complaint / Grievance Letter",
+          "Application / Request Letter",
+          "Letter to Bank Manager / Authority",
+          "Essay Writing (Structure: Intro, Body, Conclusion)",
+          "Essay Topics: Banking & Economy",
+          "Essay Topics: Social Issues",
+          "Essay Topics: Technology & AI",
+          "Essay Topics: Current Affairs & Government Policies",
+          "Opening & Closing Lines for Essays",
+          "Word Limit & Time Management (30 min, 2 questions)",
+          "Grammar, Vocabulary & Coherence in Writing",
+          "Practice: Timed Descriptive Mock Tests",
+        ],
+      },
     ],
   },
 
@@ -491,6 +518,24 @@ export const SYLLABUS: SyllabusSubject[] = [
           "Programming Languages (Basics)",
           "E-Governance Initiatives",
           "Digital India",
+        ],
+      },
+      // ---------- NEW: SBI PO Mains "Reasoning & Computer Aptitude" ----------
+      {
+        name: "Computer Aptitude (Mains)",
+        topics: [
+          "Number Systems (Binary, Octal, Decimal, Hexadecimal)",
+          "Number System Conversions",
+          "Binary Arithmetic (Addition, Subtraction, Complement)",
+          "Logic Gates (AND, OR, NOT, NAND, NOR, XOR)",
+          "Truth Tables & Boolean Algebra Basics",
+          "Flowcharts & Algorithms (Basic Logic)",
+          "Pseudo-code / Basic Programming Logic",
+          "Output Prediction of Simple Code Snippets",
+          "Data Structures Basics (Array, Stack, Queue)",
+          "Computer Memory & Data Representation (ASCII, Unicode)",
+          "Logical Reasoning on Computer Concepts",
+          "Mixed Reasoning + Computer Aptitude Practice Sets",
         ],
       },
     ],
@@ -656,6 +701,35 @@ export const SYLLABUS: SyllabusSubject[] = [
           "Nachiket Mor Committee",
           "Economic Survey Highlights",
           "Union Budget Highlights",
+        ],
+      },
+      // ---------- NEW: SBI PO Mains "General / Economy / Banking Awareness" ----------
+      {
+        name: "Economy Basics (Mains)",
+        topics: [
+          "Types of Economy (Capitalist, Socialist, Mixed)",
+          "Sectors of Economy (Primary, Secondary, Tertiary)",
+          "National Income (GDP, GNP, NNP, GVA, Per Capita Income)",
+          "Fiscal Policy (Revenue & Expenditure)",
+          "Budget Terms (Fiscal, Revenue, Primary Deficit)",
+          "FRBM Act",
+          "Direct Taxes (Income Tax, Corporate Tax)",
+          "Indirect Taxes & GST (GST Council, Slabs)",
+          "Subsidies & Disinvestment",
+          "Balance of Payments (Current & Capital Account)",
+          "Foreign Trade, Exports & Imports",
+          "Exchange Rate & Forex Reserves",
+          "Types of Inflation & Measures to Control",
+          "Poverty, Unemployment & Human Development Index",
+          "NITI Aayog & Planning in India",
+          "Agriculture & Industrial Policy Basics",
+          "IMF (Functions, Reports & Indices)",
+          "World Bank Group",
+          "Asian Development Bank (ADB)",
+          "AIIB (Asian Infrastructure Investment Bank)",
+          "NDB (New Development Bank - BRICS Bank)",
+          "WTO & Trade Agreements",
+          "Headquarters, Presidents & Heads of Financial Institutions",
         ],
       },
     ],
@@ -878,6 +952,38 @@ export const SYLLABUS: SyllabusSubject[] = [
           "Customer Handling Scenarios",
           "Conflict Resolution",
           "Decision Making Under Stress",
+        ],
+      },
+      // ---------- NEW: SBI PO Phase 3 ----------
+      {
+        name: "Group Exercise (Phase 3)",
+        topics: [
+          "GE Format & Evaluation Criteria",
+          "How to Start a Group Discussion",
+          "Presenting Points with Facts & Examples",
+          "Active Listening & Building on Others' Points",
+          "Handling Interruptions & Dominant Participants",
+          "Leadership & Team Contribution in a Group",
+          "Time Management & Proper Closure / Summarising",
+          "Common GE Topics: Banking & Economy",
+          "Common GE Topics: Social & Current Issues",
+          "Common GE Topics: Technology & Governance",
+          "Common GE Topics: Case-based / Situational",
+          "Mock Group Exercise Practice",
+        ],
+      },
+      {
+        name: "Psychometric Test (Phase 3)",
+        topics: [
+          "Test Overview & Purpose (Personality, Not Pass/Fail Aptitude)",
+          "Personality Trait Questions (Consistency is Key)",
+          "Situational Judgement Questions",
+          "Work Ethics & Integrity Scenarios",
+          "Team vs Individual Work Preferences",
+          "Stress & Pressure Handling Questions",
+          "Decision Making & Risk-taking Style",
+          "Time Management for the Test",
+          "Practice: Sample Psychometric Questions",
         ],
       },
     ],

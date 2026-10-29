@@ -35,7 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Wordmark } from "./Primitives";
 import { CommandPalette } from "./CommandPalette";
 import { FocusMode } from "./views/FocusMode";
-import { MissionControl } from "./views/MissionControl";
+import { Dashboard } from "./views/Dashboard";
 import { Coach } from "./views/Coach";
 import { Practice } from "./views/Practice";
 import { MockTest } from "./views/MockTest";
@@ -59,7 +59,7 @@ const NAV: {
   icon: typeof LayoutDashboard;
   group: string;
 }[] = [
-  { view: "mission", label: "Mission Control", icon: LayoutDashboard, group: "Operate" },
+  { view: "mission", label: "Dashboard", icon: LayoutDashboard, group: "Operate" },
   { view: "challenge", label: "Daily Challenge", icon: Target, group: "Operate" },
   { view: "coach", label: "AI Coach", icon: Sparkles, group: "Operate" },
   { view: "timer", label: "Study Timer", icon: Clock, group: "Operate" },
@@ -82,7 +82,7 @@ function ViewRouter() {
 
   switch (activeView) {
     case "mission":
-      return <MissionControl />;
+      return <Dashboard />;
     case "challenge":
       return <DailyChallenge />;
     case "coach":
@@ -114,7 +114,7 @@ function ViewRouter() {
     case "settings":
       return <SettingsView />;
     default:
-      return <MissionControl />;
+      return <Dashboard />;
   }
 }
 

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -167,13 +168,13 @@ model PlannerTask {
   priority    String   @default("medium")
   status      String   @default("pending")
   estMinutes  Int      @default(30)
+  studiedSeconds Int   @default(0)
   description String   @default("")
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   profileId   String
   profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
   @@index([profileId, date])
 }
 

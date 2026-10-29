@@ -120,7 +120,7 @@ export function FocusMode() {
         durationSec: seconds,
       });
     }
-    // Mark the mission as complete on Mission Control so progress/checkbox
+    // Mark the mission as complete on the Dashboard so progress/checkbox
     // actually reflects the work done here — this was previously never wired up.
     if (focusMission && !focusMission.done && attempted > 0) {
       toggleMission.mutate(focusMission.id);
@@ -195,7 +195,7 @@ export function FocusMode() {
               onClick={finish}
               className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/60 hover:bg-white/10"
             >
-              Back to Mission Control
+              Back to Dashboard
             </button>
           </div>
         </div>
@@ -513,7 +513,7 @@ function SessionComplete({
           onClick={onFinish}
           className="mt-6 w-full rounded-xl bg-gradient-to-b from-violet-500 to-electric-600 py-3 text-sm font-semibold text-white"
         >
-          Back to Mission Control
+          Back to Dashboard
         </button>
       </motion.div>
     </motion.div>

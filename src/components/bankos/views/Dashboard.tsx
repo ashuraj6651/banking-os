@@ -1,21 +1,23 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
+  ArrowRight,
+  BookOpen,
+  Brain,
   Check,
   Clock,
   Flame,
-  Target,
-  Zap,
-  TrendingUp,
-  ArrowRight,
-  Sparkles,
-  BookOpen,
-  Brain,
-  Sigma,
   Newspaper,
+  Sigma,
+  Sparkles,
+  Target,
   Timer,
+  TrendingUp,
   Trophy,
+  Zap,
+  LayoutDashboard,
 } from "lucide-react";
 import { useBankOS } from "@/lib/store";
 import {
@@ -39,17 +41,49 @@ const MISSION_ICON: Record<string, typeof BookOpen> = {
   mock: Timer,
 };
 
-export function MissionControl() {
+function useDailyGoal() {
+  const [goal, setGoal] = useState(50);
+  useEffect(() => {
+    const read = () => {
+      try {
+        const raw = localStorage.getItem("bankos_setting_dailyGoal");
+        const n = raw ? Number(JSON.parse(raw)) : 50;
+        setGoal(Number.isFinite(n) && n > 0 ? n : 50);
+      } catch {
+        setGoal(50);
+      }
+    };
+    read();
+    window.addEventListener("bankos:settings-change", read);
+    return () => window.removeEventListener("bankos:settings-change", read);
+  }, []);
+  return goal;
+}
+
+export function Dashboard() {
   const { startSession, setView } = useBankOS();
-  const { data: stats, isLoading: statsLoading, isError: statsError, error: statsErrorObj, refetch: refetchStats } = useProfileStats();
-  const { data: missionsData, isLoading: missionsLoading, isError: missionsError, error: missionsErrorObj, refetch: refetchMissions } = useMissions();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    error: statsErrorObj,
+    refetch: refetchStats,
+  } = useProfileStats();
+  const {
+    data: missionsData,
+    isLoading: missionsLoading,
+    isError: missionsError,
+    error: missionsErrorObj,
+    refetch: refetchMissions,
+  } = useMissions();
   const toggleMission = useToggleMission();
   const { data: analytics } = useAnalytics();
+  const dailyGoal = useDailyGoal();
 
   const missions = missionsData?.missions ?? [];
   const doneCount = missions.filter((m) => m.done).length;
   const progress = missions.length ? Math.round((doneCount / missions.length) * 100) : 0;
-  const nextMissionId = missions.find((m) => !m.done)?.id;
+  const nextMission = missions.find((m) => !m.done);
   const profile = stats?.profile;
   const readiness = stats?.readiness;
   const s = stats?.stats;
@@ -83,7 +117,6 @@ export function MissionControl() {
     );
   }
 
-  // show initial loading if profile data or missions are still being fetched
   if (!profile && (statsLoading || missionsLoading)) {
     return (
       <div className="grid min-h-[50vh] place-items-center">
@@ -94,7 +127,6 @@ export function MissionControl() {
     );
   }
 
-  // no profile (but not loading) — prompt onboarding
   if (!profile) {
     return (
       <div className="grid min-h-[50vh] place-items-center">
@@ -117,20 +149,20 @@ export function MissionControl() {
   return (
     <div className="space-y-6">
       {/* ===== Hero greeting ===== */}
-      <GlassCard hover={false} className="relative overflow-hidden p-5 sm:p-6">
+      <GlassCard hover={false} className="relative overflow-hidden p-6 sm:p-8">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-electric-500/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <GlowBadge color="violet">
-                <Sparkles className="h-3 w-3" /> Mission Control
+                <LayoutDashboard className="h-3 w-3" /> Mission Control
               </GlowBadge>
               <span className="text-xs text-white/40">
                 {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
               </span>
             </div>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
               {greeting}, <span className="text-gradient-static">{profile.name}</span>
             </h1>
             <p className="mt-2 text-sm text-white/50">
@@ -227,7 +259,7 @@ export function MissionControl() {
             )}
             {missions.map((m, i) => {
               const Icon = MISSION_ICON[m.type] ?? BookOpen;
-              const isNext = !m.done && m.id === nextMissionId;
+              const isNext = !m.done && m.id === nextMission?.id;
               return (
                 <motion.button
                   key={m.id}
@@ -304,7 +336,6 @@ export function MissionControl() {
           </div>
         </GlassCard>
 
-        {/* Side column */}
         <div className="space-y-6">
           {/* Roadmap briefing */}
           <GlassCard delay={0.1}>
@@ -440,7 +471,6 @@ function DailyGoalCard({ attempts }: { attempts: number }) {
 }
 
 function RoadmapText({ md }: { md: string }) {
-  // render markdown-lite
   const lines = md.split("\n");
   return (
     <div className="space-y-1.5">
@@ -452,12 +482,15 @@ function RoadmapText({ md }: { md: string }) {
           return (
             <div key={i} className="flex gap-2">
               <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-violet-400" />
-              <span>{clean.replace("- ", "")}</span>
+              <span className="text-white/60">{clean.replace("- ", "")}</span>
             </div>
           );
         }
         return (
-          <div key={i} className={isHead ? "font-semibold text-white/80" : ""}>
+          <div key={i} className={cn(
+            "transition-colors",
+            isHead ? "font-bold text-white/80" : "text-white/50"
+          )}>
             {clean}
           </div>
         );

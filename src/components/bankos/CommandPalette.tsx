@@ -26,7 +26,7 @@ import { useBankOS } from "@/lib/store";
 import type { AppView } from "@/lib/data";
 
 const ITEMS: { view: AppView; label: string; icon: typeof LayoutDashboard; hint: string }[] = [
-  { view: "mission", label: "Mission Control", icon: LayoutDashboard, hint: "Dashboard" },
+  { view: "mission", label: "Dashboard", icon: LayoutDashboard, hint: "Home" },
   { view: "challenge", label: "AI Coach — Ask anything", icon: Sparkles, hint: "Mentor" },
   { view: "practice", label: "Practice Questions", icon: Layers, hint: "Drill" },
   { view: "mock", label: "Start a Mock Test", icon: Timer, hint: "Exam sim" },

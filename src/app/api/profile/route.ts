@@ -24,10 +24,18 @@ export async function PATCH(req: NextRequest) {
       data.name = body.name.trim();
     }
     if (typeof body.exam === "string") {
-      data.exam = body.exam.trim();
+      const exam = body.exam.trim();
+      if (!exam) {
+        return NextResponse.json({ error: "Please select a target exam" }, { status: 400 });
+      }
+      data.exam = exam;
     }
-    if (typeof body.goal === "string") {
-      data.roadmap = body.goal.trim();
+    if (typeof body.targetDate === "string" && body.targetDate) {
+      const d = new Date(body.targetDate);
+      if (Number.isNaN(d.getTime())) {
+        return NextResponse.json({ error: "Invalid target date" }, { status: 400 });
+      }
+      data.targetDate = d;
     }
     if (typeof body.roadmap === "string") {
       data.roadmap = body.roadmap.trim();

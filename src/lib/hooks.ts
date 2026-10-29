@@ -6,9 +6,6 @@ import type { AvatarId } from "@/lib/avatars";
 async function jfetch<T>(url: string, opts?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs = 30000, ...rest } = opts ?? {};
 
-  // Guard against requests that never resolve (e.g. a hung AI call on the
-  // server). Without this, a stuck backend call left the "Loading..." UI
-  // spinning forever with no way for the user to recover.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -29,7 +26,6 @@ async function jfetch<T>(url: string, opts?: RequestInit & { timeoutMs?: number 
     clearTimeout(timer);
   }
   if (!res.ok) {
-    // Parse the server's error message so callers can show it to the user
     let serverMsg = "";
     try {
       const body = await res.json();
@@ -89,6 +85,7 @@ export type PlannerTask = {
   status: "pending" | "done" | string;
   estMinutes: number;
   description: string;
+  studiedSeconds?: number;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -129,15 +126,17 @@ export function useUpdateProfile() {
     mutationFn: (body: {
       name?: string;
       exam?: string;
-      goal?: string;
+      targetDate?: string;
       roadmap?: string;
     }) => jfetch<{ profile: Profile }>("/api/profile", {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["profile"] });
-      qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      // Target exam / date feed the dashboard, readiness and topbar — refresh them all.
+      for (const key of ["profile", "profile-stats", "readiness", "analytics", "missions"]) {
+        qc.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
 }
@@ -222,25 +221,7 @@ export function useToggleMission() {
   return useMutation({
     mutationFn: (id: string) =>
       jfetch(`/api/missions/${id}`, { method: "PATCH" }),
-    // Flip the checkbox in the local cache immediately instead of waiting
-    // for the PATCH + refetch round trip — this is what was making the
-    // checklist feel like it took 4-5s to respond.
-    onMutate: async (id: string) => {
-      await qc.cancelQueries({ queryKey: ["missions"] });
-      const previous = qc.getQueryData<{ missions: Mission[] }>(["missions"]);
-      qc.setQueryData<{ missions: Mission[] } | undefined>(["missions"], (old) => {
-        if (!old) return old;
-        return {
-          missions: old.missions.map((m) => (m.id === id ? { ...m, done: !m.done } : m)),
-        };
-      });
-      return { previous };
-    },
-    onError: (_err, _id, context) => {
-      // Roll back if the server call actually failed.
-      if (context?.previous) qc.setQueryData(["missions"], context.previous);
-    },
-    onSettled: () => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["missions"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
@@ -358,11 +339,9 @@ export function useQuestions(subject?: string, difficulty?: string, refreshKey =
   if (refreshKey > 0) params.set("refresh", "true");
   return useQuery({
     queryKey: ["questions", subject, difficulty, refreshKey, topic],
-    // Generous timeout since this can trigger AI question generation on the
-    // server, but capped so a hung Groq call can't spin the UI forever.
     queryFn: () =>
       jfetch<{ questions: Question[] }>(`/api/questions?${params}`, { timeoutMs: 45000 }),
-    staleTime: 5 * 60 * 1000, // 5 min stale time for questions
+    staleTime: 5 * 60 * 1000, // 5 min staleTime for questions
     retry: 1,
   });
 }
@@ -403,9 +382,9 @@ export function useStartSession() {
   return useMutation({
     mutationFn: () =>
       jfetch<{ session: { id: string } }>("/api/sessions", {
-        method: "POST",
-        body: JSON.stringify({ action: "start" }),
-      }),
+      method: "POST",
+      body: JSON.stringify({ action: "start" }),
+    }),
   });
 }
 
@@ -420,7 +399,7 @@ export function useEndSession() {
     }) =>
       jfetch("/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ action: "end", ...body }),
+        body: JSON.stringify(body),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["analytics"] });
@@ -442,7 +421,7 @@ export function useAnalytics() {
         accuracy: number;
         totalHours: number;
         mocksTaken: number;
-        studyHours: { day: string; hours: number; accuracy: number }[];
+        studyHours: { day: string; hours: number; accuracy: number }[] ;
         mockHistory: { name: string; score: number; percentile: number }[];
         sectionTime: { section: string; time: number; accuracy: number }[];
         mastery: { subject: string; mastery: number; color: string }[];
@@ -532,7 +511,7 @@ export function useCurrentAffairs() {
       }[];
         count?: number;
         providerCount?: number;
-        source?: "provider" | "database" | "error";
+        source?: "provider" | "database" | "source";
         stale?: boolean;
         empty?: boolean;
       }>("/api/current-affairs"),
@@ -543,7 +522,7 @@ export function useReadiness() {
   return useQuery({
     queryKey: ["readiness"],
     queryFn: () =>
-      jfetch<{ empty?: boolean; profile?: Profile; readiness?: Readiness }>("/api/readiness"),
+      jfetch<{ empty?: boolean; profile?: Profile; readiness: Readiness }>("/api/readiness"),
   });
 }
 
@@ -552,7 +531,6 @@ export function useSkillTree() {
     queryKey: ["skilltree"],
     queryFn: () =>
       jfetch<{
-        empty?: boolean;
         tree: {
           id: string;
           name: string;
@@ -570,7 +548,6 @@ export function useWorld() {
     queryKey: ["world"],
     queryFn: () =>
       jfetch<{
-        empty?: boolean;
         regions: {
           id: string;
           name: string;
@@ -580,6 +557,7 @@ export function useWorld() {
           desc: string;
           progress: number;
           unlocked: boolean;
+          children: { id: string; name: string; mastery: number; unlocked: boolean; attempts: number }[];
         }[];
       }>("/api/world"),
   });
@@ -604,14 +582,12 @@ export function useMocks() {
 }
 
 export function useStartMock() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { title: string; durationSec: number }) =>
       jfetch<{ mock: { id: string } }>("/api/mocks", {
         method: "POST",
-        body: JSON.stringify({ action: "start", ...body }),
+        body: JSON.stringify(body),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mocks"] }),
   });
 }
 
@@ -621,10 +597,9 @@ export function useCompleteMock() {
     mutationFn: (body: { mockId: string; score: number }) =>
       jfetch("/api/mocks", {
         method: "POST",
-        body: JSON.stringify({ action: "complete", ...body }),
+        body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mocks"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
@@ -636,13 +611,13 @@ export function useClearMocks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      jfetch<{ deleted: number }>("/api/mocks", {
+      jfetch("/api/mocks", {
         method: "DELETE",
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mocks"] });
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }
@@ -656,9 +631,6 @@ export function useAuth() {
         account: { id: string; email: string; name: string } | null;
         hasProfile?: boolean;
       }>("/api/auth/me"),
-    // Never serve auth from stale cache — always verify with the server
-    staleTime: 0,
-    gcTime: 0,
   });
 }
 
@@ -671,21 +643,7 @@ export function useRegister() {
         body: JSON.stringify(body),
       }),
     onSuccess: async () => {
-      // Refetch auth FIRST, while its cache entry still exists and still has
-      // an active observer (page.tsx's useAuth()). This is what flips
-      // `account`/`hasProfile` and lets page.tsx's effect move us off the
-      // Auth screen immediately.
-      //
-      // We used to call qc.clear() before this, but clear() wipes the
-      // "auth" query out of the cache too — so the refetchQueries call right
-      // after had nothing left to match and silently did nothing. The login
-      // API call still succeeded (cookie set correctly), which is why a
-      // manual refresh "fixed" it: a fresh page load re-runs the auth query
-      // from scratch. But without a refresh, the UI just sat on the login
-      // screen forever.
       await qc.refetchQueries({ queryKey: ["auth"] });
-      // Now wipe every other cached query so no previous user's data leaks
-      // into the new session (leave "auth" alone — it's already correct).
       qc.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
     },
   });
@@ -700,7 +658,6 @@ export function useLogin() {
         body: JSON.stringify(body),
       }),
     onSuccess: async () => {
-      // See useRegister for why we refetch "auth" before clearing anything else.
       await qc.refetchQueries({ queryKey: ["auth"] });
       qc.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
     },
@@ -712,10 +669,6 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => jfetch("/api/auth/logout", { method: "POST" }),
     onSuccess: async () => {
-      // Same fix as login/register: refetch "auth" first (now returning
-      // account: null) so the UI reacts immediately, then clear everything
-      // else so the next person to sign in on this device never sees stale
-      // data from this session.
       await qc.refetchQueries({ queryKey: ["auth"] });
       qc.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
     },
@@ -737,7 +690,10 @@ export function useImportBackup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: unknown) =>
-      jfetch("/api/backup/import", { method: "POST", body: JSON.stringify(data) }),
+      jfetch("/api/backup/import", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     onSuccess: () => {
       qc.invalidateQueries();
     },
@@ -760,9 +716,6 @@ export function useToggleSyllabus() {
   return useMutation({
     mutationFn: (body: { subject: string; topic: string }) =>
       jfetch("/api/syllabus", { method: "PATCH", body: JSON.stringify(body) }),
-    // Flip the checkbox in the local cache immediately instead of waiting on
-    // the PATCH + refetch round trip — this is what made every tap on the
-    // syllabus checklist feel like it took a few seconds to respond.
     onMutate: async ({ subject, topic }: { subject: string; topic: string }) => {
       await qc.cancelQueries({ queryKey: ["syllabus"] });
       const previous = qc.getQueryData<{
@@ -773,7 +726,6 @@ export function useToggleSyllabus() {
         const rows = old?.progress ?? [];
         const idx = rows.findIndex((p) => p.subject === subject && p.topic === topic);
         if (idx === -1) {
-          // wasn't tracked yet — optimistically add it as checked
           return { progress: [...rows, { subject, topic, checked: true, checkedAt: new Date().toISOString() }] };
         }
         const next = [...rows];
@@ -784,7 +736,6 @@ export function useToggleSyllabus() {
       return { previous };
     },
     onError: (_err, _vars, context) => {
-      // Roll back if the server call actually failed.
       if (context?.previous) qc.setQueryData(["syllabus"], context.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["syllabus"] }),

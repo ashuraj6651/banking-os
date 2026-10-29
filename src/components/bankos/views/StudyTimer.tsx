@@ -18,10 +18,14 @@ import {
   Settings2,
   X,
   Check,
+  Square,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard, GlassPanel } from "../GlassCard";
 import { cn } from "@/lib/utils";
+import { usePlannerTimer } from "@/hooks/use-planner-timer";
+import { useUpdatePlannerTask, useTogglePlannerTask } from "@/lib/hooks";
+import { toast } from "sonner";
 
 /* ─── constants ─── */
 const FOCUS_MINUTES = 25;
@@ -149,12 +153,10 @@ function loadTimerState(): TimerState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as TimerState;
-      // If the timer was running, calculate elapsed time
       if (parsed.isRunning && parsed._savedAt) {
         const elapsed = Math.floor((Date.now() - parsed._savedAt) / 1000);
         const newRemaining = parsed.remainingSeconds - elapsed;
         if (newRemaining <= 0) {
-          // Timer would have expired — reset to same mode but not running
           return {
             mode: parsed.mode,
             remainingSeconds: MODE_CONFIG[parsed.mode].minutes * 60,
@@ -201,7 +203,6 @@ function loadDayStats(): DayStats {
     if (raw) {
       const parsed = JSON.parse(raw) as DayStats;
       if (parsed.date === getTodayStr()) return parsed;
-      // New day — compute streak
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().slice(0, 10);
@@ -223,7 +224,6 @@ function saveDayStats(stats: DayStats) {
   }
 }
 
-/* ─── Web Audio beep ─── */
 function playBeep() {
   if (typeof window === "undefined") return;
   try {
@@ -238,8 +238,6 @@ function playBeep() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.8);
-
-    // Second beep
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.connect(gain2);
@@ -255,7 +253,6 @@ function playBeep() {
   }
 }
 
-/* ─── Timer ring component ─── */
 function TimerRing({
   progress,
   timeDisplay,
@@ -275,7 +272,6 @@ function TimerRing({
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      {/* Glow backdrop */}
       <div
         className="absolute inset-0 rounded-full opacity-20 blur-2xl"
         style={{ background: `radial-gradient(circle, ${config.color} 0%, transparent 70%)` }}
@@ -287,9 +283,7 @@ function TimerRing({
             <stop offset="100%" stopColor={mode === "focus" ? "#22d3ee" : mode === "shortBreak" ? "#8b5cf6" : "#22d3ee"} />
           </linearGradient>
         </defs>
-        {/* Track */}
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-        {/* Progress */}
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -316,7 +310,6 @@ function TimerRing({
   );
 }
 
-/* ─── Mode selector pill ─── */
 function ModeSelector({
   activeMode,
   onSelect,
@@ -351,8 +344,12 @@ function ModeSelector({
   );
 }
 
-/* ─── Main component ─── */
 export function StudyTimer() {
+  // Planner Timer state
+  const plannerTimer = usePlannerTimer(new Date());
+  const isPlannerMode = !!plannerTimer.state.activeTaskId;
+
+  // Pomodoro state
   const [timerState, setTimerState] = useState<TimerState>(loadTimerState);
   const [dayStats, setDayStats] = useState<DayStats>(loadDayStats);
   const [durations, setDurations] = useState<TimerDurations>(loadDurations);
@@ -367,14 +364,10 @@ export function StudyTimer() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isRunningRef = useRef(timerState.isRunning);
 
-  // Keep isRunningRef in sync
   useEffect(() => {
     isRunningRef.current = timerState.isRunning;
   }, [timerState.isRunning]);
 
-  // On mount: if a custom duration was saved and the timer isn't running,
-  // make sure the displayed time reflects it (loadTimerState() runs before
-  // durations are known, so it can't do this itself).
   useEffect(() => {
     setTimerState((prev) => {
       if (prev.isRunning) return prev;
@@ -382,22 +375,18 @@ export function StudyTimer() {
       if (prev.totalSeconds === minutes * 60) return prev;
       return { ...prev, remainingSeconds: minutes * 60, totalSeconds: minutes * 60 };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist timer state
   useEffect(() => {
     saveTimerState(timerState);
   }, [timerState]);
 
-  // Persist sound preference
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem(SOUND_KEY, String(soundEnabled));
     }
   }, [soundEnabled]);
 
-  // Rotate quotes during focus
   useEffect(() => {
     if (timerState.isRunning && timerState.mode === "focus") {
       const id = setInterval(() => {
@@ -407,7 +396,6 @@ export function StudyTimer() {
     }
   }, [timerState.isRunning, timerState.mode]);
 
-  // Handle timer completion — defined before the tick effect
   const handleTimerComplete = useCallback((prev: TimerState): TimerState => {
     if (prev.mode === "focus") {
       const newSessions = prev.sessionsCompleted + 1;
@@ -419,7 +407,6 @@ export function StudyTimer() {
       };
       setDayStats(newStats);
       saveDayStats(newStats);
-
       const nextMode: TimerMode = newSessions % SESSIONS_BEFORE_LONG === 0 ? "longBreak" : "shortBreak";
       const nextMinutes = durations[nextMode];
       return {
@@ -441,7 +428,6 @@ export function StudyTimer() {
     }
   }, [dayStats, durations]);
 
-  // Timer tick
   useEffect(() => {
     if (timerState.isRunning) {
       intervalRef.current = setInterval(() => {
@@ -489,19 +475,16 @@ export function StudyTimer() {
     setSoundEnabled((prev) => !prev);
   }, []);
 
-  // Persist duration preferences, and apply new durations to the
-  // current mode immediately if the timer isn't running right now.
   const applyDurations = useCallback((next: TimerDurations) => {
     setDurations(next);
     saveDurations(next);
     setTimerState((prev) => {
-      if (prev.isRunning) return prev; // don't yank time out from under an active session
+      if (prev.isRunning) return prev;
       const minutes = next[prev.mode];
       return { ...prev, remainingSeconds: minutes * 60, totalSeconds: minutes * 60 };
     });
   }, []);
 
-  // Computed
   const progress = timerState.totalSeconds > 0
     ? ((timerState.totalSeconds - timerState.remainingSeconds) / timerState.totalSeconds) * 100
     : 0;
@@ -509,16 +492,26 @@ export function StudyTimer() {
   const seconds = timerState.remainingSeconds % 60;
   const timeDisplay = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   const currentConfig = MODE_CONFIG[timerState.mode];
-  const sessionInCycle = (timerState.sessionsCompleted % SESSIONS_BEFORE_LONG) + (timerState.mode === "focus" ? 1 : 0);
+
+  const formatPlannerElapsed = (ms: number) => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return h > 0 
+      ? `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
+      : `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <ViewHeader
-        badge="Focus"
+        badge={isPlannerMode ? "Planner" : "Focus"}
         badgeIcon={<Clock className="h-3 w-3" />}
-        title="Study Timer"
-        subtitle={`Pomodoro technique — focused ${durations.focus}-min sprints with strategic breaks`}
+        title={isPlannerMode ? "Task Timer" : "Study Timer"}
+        subtitle={isPlannerMode 
+          ? `Studying: ${plannerTimer.state.title}` 
+          : `Pomodoro technique — focused ${durations.focus}-min sprints with strategic breaks`}
         actions={
           <>
             <button
@@ -530,7 +523,8 @@ export function StudyTimer() {
                 "grid h-9 w-9 place-items-center rounded-xl border transition-colors",
                 settingsOpen
                   ? "border-violet-400/40 bg-violet-500/10 text-violet-300"
-                  : "border-white/10 bg-white/5 text-white/60 hover:text-white"
+                  : "border-white/10 bg-white/5 text-white/60 hover:text-white",
+                isPlannerMode && "hidden"
               )}
               title="Customise timer durations"
             >
@@ -552,7 +546,6 @@ export function StudyTimer() {
         }
       />
 
-      {/* Duration settings panel */}
       <AnimatePresence>
         {settingsOpen && (
           <motion.div
@@ -632,82 +625,124 @@ export function StudyTimer() {
         )}
       </AnimatePresence>
 
-      {/* Timer card */}
       <GlassCard hover={false} className="relative overflow-hidden">
         <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
         <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-electric-500/10 blur-3xl" />
         <div className="relative flex flex-col items-center gap-8 p-6 sm:p-10">
-          {/* Mode selector */}
-          <ModeSelector activeMode={timerState.mode} onSelect={switchMode} />
+          {isPlannerMode ? (
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300">
+                <Target className="h-3 w-3" /> Planner Task Mode
+              </div>
+              <h2 className="text-2xl font-bold text-white">{plannerTimer.state.title}</h2>
+            </div>
+          ) : (
+            <ModeSelector activeMode={timerState.mode} onSelect={switchMode} />
+          )}
 
-          {/* Timer ring */}
-          <TimerRing progress={progress} timeDisplay={timeDisplay} mode={timerState.mode} />
+          <TimerRing 
+            progress={isPlannerMode ? 0 : progress} 
+            timeDisplay={isPlannerMode ? formatPlannerElapsed(plannerTimer.elapsedMs) : timeDisplay} 
+            mode={isPlannerMode ? "focus" : timerState.mode} 
+          />
 
-          {/* Controls */}
           <div className="flex items-center gap-3">
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={resetTimer}
-              className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-              title="Reset"
-            >
-              <RotateCcw className="h-5 w-5" />
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleRunning}
-              className={cn(
-                "grid h-16 w-16 place-items-center rounded-3xl text-white shadow-xl transition-shadow",
-                `bg-gradient-to-b ${currentConfig.gradient}`,
-                timerState.isRunning
-                  ? "shadow-violet-500/20 hover:shadow-violet-500/40"
-                  : "shadow-violet-500/30 hover:shadow-violet-500/50"
-              )}
-              title={timerState.isRunning ? "Pause" : "Start"}
-            >
-              {timerState.isRunning ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-0.5" />}
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={() => {
-                const nextMode: TimerMode = timerState.mode === "focus"
-                  ? (timerState.sessionsCompleted % SESSIONS_BEFORE_LONG === 3 ? "longBreak" : "shortBreak")
-                  : "focus";
-                switchMode(nextMode);
-              }}
-              className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-              title="Skip to next"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </motion.button>
+            {isPlannerMode ? (
+              <>
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => plannerTimer.pauseTimer()}
+                  className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                  title="Pause"
+                >
+                  {plannerTimer.state.startedAt ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => plannerTimer.stopTimer(false)}
+                  className="grid h-16 w-16 place-items-center rounded-3xl text-white shadow-xl transition-shadow bg-gradient-to-b from-violet-500 to-electric-600"
+                  title="Stop & Save"
+                >
+                  <Square className="h-7 w-7 fill-current" />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => plannerTimer.stopTimer(true)}
+                  className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-500"
+                  title="Finish and mark complete"
+                >
+                  <Check className="h-4 w-4" /> Finish & Done
+                </motion.button>
+              </>
+            ) : (
+              <>
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={resetTimer}
+                  className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                  title="Reset"
+                >
+                  <RotateCcw className="h-5 w-5" />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleRunning}
+                  className={cn(
+                    "grid h-16 w-16 place-items-center rounded-3xl text-white shadow-xl transition-shadow",
+                    `bg-gradient-to-b ${currentConfig.gradient}`,
+                    timerState.isRunning
+                      ? "shadow-violet-500/20 hover:shadow-violet-500/40"
+                      : "shadow-violet-500/30 hover:shadow-violet-500/50"
+                  )}
+                  title={timerState.isRunning ? "Pause" : "Start"}
+                >
+                  {timerState.isRunning ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-0.5" />}
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => {
+                    const nextMode: TimerMode = timerState.mode === "focus"
+                      ? (timerState.sessionsCompleted % SESSIONS_BEFORE_LONG === 3 ? "longBreak" : "shortBreak")
+                      : "focus";
+                    switchMode(nextMode);
+                  }}
+                  className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                  title="Skip to next"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </motion.button>
+              </>
+            )}
           </div>
 
           {/* Session progress dots */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40">Sessions</span>
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: SESSIONS_BEFORE_LONG }).map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "h-2.5 w-2.5 rounded-full transition-all duration-500",
-                    i < timerState.sessionsCompleted % SESSIONS_BEFORE_LONG
-                      ? "bg-gradient-to-br from-violet-400 to-electric-400 shadow-[0_0_8px_rgba(139,92,246,0.5)]"
-                      : i === timerState.sessionsCompleted % SESSIONS_BEFORE_LONG && timerState.mode === "focus"
-                        ? "border border-violet-400/50 bg-violet-500/20"
-                        : "bg-white/10"
-                  )}
-                />
-              ))}
+          {!isPlannerMode && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-white/40">Sessions</span>
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: SESSIONS_BEFORE_LONG }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full transition-all duration-500",
+                      i < timerState.sessionsCompleted % SESSIONS_BEFORE_LONG
+                        ? "bg-gradient-to-br from-violet-400 to-electric-400 shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+                        : i === timerState.sessionsCompleted % SESSIONS_BEFORE_LONG && timerState.mode === "focus"
+                          ? "border border-violet-400/50 bg-violet-500/20"
+                          : "bg-white/10"
+                    )}
+                  />
+                ))}
+              </div>
+              <span className="text-xs font-medium text-white/50">
+                #{timerState.sessionsCompleted + (timerState.mode === "focus" ? 1 : 0)}
+              </span>
             </div>
-            <span className="text-xs font-medium text-white/50">
-              #{timerState.sessionsCompleted + (timerState.mode === "focus" ? 1 : 0)}
-            </span>
-          </div>
+          )}
 
           {/* Motivational quote (only during focus) */}
           <AnimatePresence mode="wait">
-            {timerState.mode === "focus" && (
+            {!isPlannerMode && timerState.mode === "focus" && (
               <motion.div
                 key={quoteIndex}
                 initial={{ opacity: 0, y: 8 }}
@@ -725,7 +760,6 @@ export function StudyTimer() {
 
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* Total focus minutes today */}
         <GlassCard delay={0.05}>
           <div className="flex items-center gap-4 p-5">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/10 border border-violet-500/20">
@@ -741,7 +775,6 @@ export function StudyTimer() {
           </div>
         </GlassCard>
 
-        {/* Sessions completed today */}
         <GlassCard delay={0.1}>
           <div className="flex items-center gap-4 p-5">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
@@ -759,7 +792,6 @@ export function StudyTimer() {
           </div>
         </GlassCard>
 
-        {/* Current streak */}
         <GlassCard delay={0.15}>
           <div className="flex items-center gap-4 p-5">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 border border-amber-500/20">

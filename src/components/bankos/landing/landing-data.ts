@@ -9,7 +9,7 @@ export const FEATURES: {
   color: string;
 }[] = [
   {
-    title: "Mission Control",
+    title: "Dashboard",
     desc: "Your daily dashboard — readiness, streak, focus score and today's mission in one glance.",
     icon: "Target",
     color: "#8b5cf6",

@@ -61,13 +61,19 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useBankOS } from "@/lib/store";
 
+// Target exams a user can pick from (banking only).
 const PRESET_GOALS = [
   "SBI PO",
+  "SBI Clerk",
   "IBPS PO",
-  "LIC AAO",
+  "IBPS Clerk",
   "RBI Grade B",
-  "UPSC Prelims",
+  "NABARD",
+  "LIC AAO",
+  "RBI Assistant",
 ];
+
+const toDateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
 
 function useSetting<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(() => {
@@ -137,13 +143,15 @@ export function SettingsView() {
 
   const [profileName, setProfileName] = useState("");
   const [profileGoal, setProfileGoal] = useState("");
+  const [profileTargetDate, setProfileTargetDate] = useState("");
 
   useEffect(() => {
     const profile = profileQuery.data?.profile;
     if (!profile) return;
 
     setProfileName(profile.name ?? "");
-    setProfileGoal(profile.roadmap ?? "");
+    setProfileGoal(profile.exam ?? "");
+    setProfileTargetDate(toDateInput(profile.targetDate));
   }, [profileQuery.data?.profile]);
 
   useEffect(() => {
@@ -163,10 +171,18 @@ export function SettingsView() {
 
   async function saveProfileSettings() {
     try {
+      if (!profileName.trim()) {
+        toast.error("Name cannot be empty");
+        return;
+      }
+      if (!profileGoal) {
+        toast.error("Please select your target exam");
+        return;
+      }
       await updateProfile.mutateAsync({
-        name: profileName,
-        goal: profileGoal,
-        roadmap: profileGoal,
+        name: profileName.trim(),
+        exam: profileGoal,
+        ...(profileTargetDate ? { targetDate: profileTargetDate } : {}),
       });
 
       toast.success("Profile updated");
@@ -331,9 +347,9 @@ export function SettingsView() {
 
           <div className="space-y-3">
             <div>
-              <div className="text-sm font-medium text-white">Goal summary</div>
+              <div className="text-sm font-medium text-white">Target exam</div>
               <div className="text-xs text-white/40">
-                Pick one of the preset goals to keep your profile concise.
+                Changing this updates your Dashboard, topbar and exam countdown.
               </div>
             </div>
 
@@ -355,13 +371,19 @@ export function SettingsView() {
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setProfileGoal("")}
-              className="text-xs text-white/50 transition hover:text-white"
-            >
-              Clear selection
-            </button>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="profile-target-date" className="text-sm font-medium text-white">
+              Exam date
+            </label>
+            <Input
+              id="profile-target-date"
+              type="date"
+              value={profileTargetDate}
+              onChange={(event) => setProfileTargetDate(event.target.value)}
+              className="max-w-[220px] [color-scheme:dark]"
+            />
           </div>
 
           <div className="flex justify-end border-t border-white/[0.06] pt-4">

@@ -23,8 +23,11 @@ export async function POST(req: NextRequest) {
     });
     setSessionCookie(res, token, expiresAt);
     return res;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch (error) {
+    console.error("Login request failed:", error);
+    return NextResponse.json(
+      { error: "Unable to sign in right now. Please try again later." },
+      { status: 500 }
+    );
   }
 }

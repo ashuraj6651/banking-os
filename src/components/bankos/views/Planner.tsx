@@ -14,6 +14,14 @@ import {
   ListTodo,
   CheckCircle2,
   Circle,
+  Copy,
+  Calendar as CalendarIcon,
+  Play,
+  Pause,
+  Square,
+  Timer as TimerIcon,
+  Check,
+  ArrowRight,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard, GlassPanel } from "../GlassCard";
@@ -39,8 +47,16 @@ import {
   useSavePlannerNote,
   PlannerTask,
 } from "@/lib/hooks";
+import { usePlannerTimer } from "@/hooks/use-planner-timer";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+type TaskWithStudy = PlannerTask & { studiedSeconds?: number | null };
 
 const PRIORITY_STYLES: Record<string, string> = {
   low: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
@@ -65,9 +81,57 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function fromDateKey(key: string) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function fmtClock(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function fmtStudied(ms: number) {
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return ms >= 1000 ? "<1m" : "0m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const r = mins % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+
+async function jfetch<T>(url: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    ...opts,
+  });
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
+
 export function Planner() {
+  const qc = useQueryClient();
   const [date, setDate] = useState(() => new Date());
   const [calOpen, setCalOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySourceDate, setCopySourceDate] = useState<Date | undefined>(undefined);
+  const [isCopying, setIsCopying] = useState(false);
 
   const { data, isLoading } = usePlannerDay(date);
   const createTask = useCreatePlannerTask(date);
@@ -75,16 +139,22 @@ export function Planner() {
   const deleteTask = useDeletePlannerTask(date);
   const saveNote = useSavePlannerNote(date);
 
-  const tasks = data?.tasks ?? [];
+  // Study timer (server-synced: studied time DB mein save hota hai)
+  const timer = usePlannerTimer();
+  const { state: timerState, elapsedMs } = timer;
+  const timerActive = !!timerState.activeTaskId;
+  const timerOnThisDate = timerActive && timerState.dateKey === toDateKey(date);
 
-  // --- add-task form state ---
+  const tasks = (data?.tasks ?? []) as TaskWithStudy[];
+
+  /* ---------------- add-task form ---------------- */
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("General");
   const [priority, setPriority] = useState("medium");
   const [estMinutes, setEstMinutes] = useState(30);
   const [description, setDescription] = useState("");
 
-  // --- quick notes ---
+  /* ---------------- quick note (auto-save) ---------------- */
   const [note, setNote] = useState("");
   const [noteDirty, setNoteDirty] = useState(false);
   useEffect(() => {
@@ -92,16 +162,15 @@ export function Planner() {
     setNoteDirty(false);
   }, [data?.note, date]);
 
-  // autosave note 900ms after the user stops typing
   useEffect(() => {
     if (!noteDirty) return;
     const t = setTimeout(() => {
       saveNote.mutate(note, { onSuccess: () => setNoteDirty(false) });
     }, 900);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note, noteDirty]);
 
+  /* ---------------- summary ---------------- */
   const summary = useMemo(() => {
     const completed = tasks.filter((t) => t.status === "done");
     const totalMinutes = tasks.reduce((s, t) => s + (t.estMinutes || 0), 0);
@@ -116,6 +185,16 @@ export function Planner() {
     };
   }, [tasks]);
 
+  const studiedTodayMs = useMemo(() => {
+    let total = 0;
+    for (const t of tasks) {
+      total += (t.studiedSeconds ?? 0) * 1000;
+      if (timerOnThisDate && timerState.activeTaskId === t.id) total += elapsedMs;
+    }
+    return total;
+  }, [tasks, timerOnThisDate, timerState.activeTaskId, elapsedMs]);
+
+  /* ---------------- task actions ---------------- */
   async function handleAddTask() {
     if (!title.trim()) {
       toast.error("Give the task a title first");
@@ -139,7 +218,14 @@ export function Planner() {
     }
   }
 
-  async function handleToggle(task: PlannerTask) {
+  async function handleToggle(task: TaskWithStudy) {
+    const willBeDone = task.status !== "done";
+    // Is task ka timer chal raha hai aur user manually complete kar raha hai:
+    // time + done status ek saath save karo (double request / lost time nahi).
+    if (willBeDone && timerState.activeTaskId === task.id) {
+      await timer.stopTimer(true);
+      return;
+    }
     try {
       await toggleTask.mutateAsync(task.id);
     } catch {
@@ -147,12 +233,74 @@ export function Planner() {
     }
   }
 
-  async function handleDelete(task: PlannerTask) {
+  async function handleDelete(task: TaskWithStudy) {
     try {
       await deleteTask.mutateAsync(task.id);
+      if (timerState.activeTaskId === task.id) timer.discardTimer();
       toast.success("Task removed");
     } catch {
       toast.error("Could not remove task");
+    }
+  }
+
+  async function handleCopyPlanner() {
+    if (!copySourceDate) return;
+
+    const sourceKey = toDateKey(copySourceDate);
+    const targetKey = toDateKey(date);
+
+    if (sourceKey === targetKey) {
+      toast.error("Source aur target date same hain");
+      return;
+    }
+
+    setIsCopying(true);
+    try {
+      const sourceData = await jfetch<{ tasks: PlannerTask[]; note: string }>(
+        `/api/planner?date=${sourceKey}`
+      );
+      const srcTasks = sourceData?.tasks ?? [];
+      const srcNote = (sourceData?.note ?? "").trim();
+
+      if (srcTasks.length === 0 && !srcNote) {
+        toast.info("Us date par copy karne ke liye kuch nahi hai");
+        return;
+      }
+
+      for (const t of srcTasks) {
+        await jfetch(`/api/planner`, {
+          method: "POST",
+          body: JSON.stringify({
+            date: targetKey,
+            title: t.title,
+            subject: t.subject,
+            priority: t.priority,
+            estMinutes: t.estMinutes,
+            description: t.description,
+          }),
+        });
+      }
+
+      if (srcNote) {
+        const existing = note.trim();
+        const merged =
+          existing && existing !== srcNote ? `${existing}\n\n${srcNote}` : srcNote;
+        await jfetch(`/api/planner/note`, {
+          method: "PUT",
+          body: JSON.stringify({ date: targetKey, content: merged }),
+        });
+      }
+
+      await qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "planner" });
+
+      toast.success(`Planner copied from ${fmtDateLabel(copySourceDate)}`);
+      setCopyOpen(false);
+      setCopySourceDate(undefined);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to copy planner");
+    } finally {
+      setIsCopying(false);
     }
   }
 
@@ -165,6 +313,11 @@ export function Planner() {
   }
 
   const isToday = isSameDay(date, new Date());
+
+  // Timer panel numbers
+  const estMs = timerState.estMinutes * 60000;
+  const timerPct = estMs ? Math.min(100, (elapsedMs / estMs) * 100) : 0;
+  const overMs = estMs && elapsedMs > estMs ? elapsedMs - estMs : 0;
 
   return (
     <div className="space-y-6">
@@ -187,16 +340,16 @@ export function Planner() {
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* ===== Main column ===== */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Date selector */}
-          <GlassCard className="p-5">
+        {/* ============ LEFT: date, add task, checklist ============ */}
+        <div className="min-w-0 space-y-6 lg:col-span-2">
+          {/* ---------------- date bar ---------------- */}
+          <GlassCard className="p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-xl text-white/60 hover:bg-white/5 hover:text-white"
+                  className="h-9 w-9 shrink-0 rounded-xl text-white/60 hover:bg-white/5 hover:text-white"
                   onClick={() => shiftDay(-1)}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -204,9 +357,9 @@ export function Planner() {
 
                 <Popover open={calOpen} onOpenChange={setCalOpen}>
                   <PopoverTrigger asChild>
-                    <button className="flex min-w-[220px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10">
-                      <CalendarDays className="h-4 w-4 text-violet-300" />
-                      {fmtDateLabel(date)}
+                    <button className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10 sm:min-w-[240px] sm:flex-none sm:px-4">
+                      <CalendarDays className="h-4 w-4 shrink-0 text-violet-300" />
+                      <span className="truncate">{fmtDateLabel(date)}</span>
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="center">
@@ -225,27 +378,73 @@ export function Planner() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-xl text-white/60 hover:bg-white/5 hover:text-white"
+                  className="h-9 w-9 shrink-0 rounded-xl text-white/60 hover:bg-white/5 hover:text-white"
                   onClick={() => shiftDay(1)}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
 
-              {!isToday && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-                  onClick={() => setDate(new Date())}
-                >
-                  Jump to today
-                </Button>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Popover open={copyOpen} onOpenChange={setCopyOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                    >
+                      <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy Planner
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-4" align="end">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <CalendarIcon className="h-4 w-4 text-violet-300" />
+                        Copy planner from date
+                      </div>
+                      <Calendar
+                        mode="single"
+                        selected={copySourceDate}
+                        onSelect={setCopySourceDate}
+                      />
+                      {copySourceDate && (
+                        <div className="flex items-center justify-between gap-2 pt-2">
+                          <span className="text-xs text-white/40">
+                            From {fmtDateLabel(copySourceDate)}
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={handleCopyPlanner}
+                            disabled={isCopying}
+                            className="rounded-lg bg-violet-600 text-white hover:bg-violet-500"
+                          >
+                            {isCopying ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Confirm Copy"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {!isToday && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                    onClick={() => setDate(new Date())}
+                  >
+                    Jump to today
+                  </Button>
+                )}
+              </div>
             </div>
           </GlassCard>
 
-          {/* Add task form */}
+          {/* ---------------- add task ---------------- */}
           <GlassCard className="p-5 sm:p-6">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Plus className="h-4 w-4 text-violet-300" /> Add a task
@@ -337,10 +536,11 @@ export function Planner() {
             </div>
           </GlassCard>
 
-          {/* Checklist */}
+          {/* ---------------- checklist ---------------- */}
           <GlassCard className="p-5 sm:p-6">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
-              <ListTodo className="h-4 w-4 text-violet-300" /> Checklist for {fmtDateLabel(date)}
+              <ListTodo className="h-4 w-4 shrink-0 text-violet-300" />
+              <span className="truncate">Checklist for {fmtDateLabel(date)}</span>
             </h3>
 
             {isLoading ? (
@@ -360,6 +560,11 @@ export function Planner() {
                 <AnimatePresence initial={false}>
                   {tasks.map((task) => {
                     const done = task.status === "done";
+                    const isActive = timerOnThisDate && timerState.activeTaskId === task.id;
+                    const isRunning = isActive && timer.isRunning;
+                    const studiedMs =
+                      (task.studiedSeconds ?? 0) * 1000 + (isActive ? elapsedMs : 0);
+
                     return (
                       <motion.li
                         key={task.id}
@@ -369,60 +574,103 @@ export function Planner() {
                         exit={{ opacity: 0, x: -12 }}
                         transition={{ duration: 0.2 }}
                         className={cn(
-                          "flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3.5 transition-colors",
-                          done && "bg-white/[0.01] opacity-60"
+                          "rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3.5 transition-colors",
+                          done && "bg-white/[0.01] opacity-60",
+                          isActive && "border-violet-400/40 bg-violet-500/[0.06]"
                         )}
                       >
-                        <button
-                          onClick={() => handleToggle(task)}
-                          className="mt-0.5 shrink-0 text-violet-300 transition-transform hover:scale-110"
-                        >
-                          {done ? (
-                            <CheckCircle2 className="h-5 w-5" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-white/25" />
-                          )}
-                        </button>
-
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              "truncate text-sm font-medium text-white",
-                              done && "text-white/40 line-through"
-                            )}
+                        <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+                          {/* manual complete */}
+                          <button
+                            onClick={() => handleToggle(task)}
+                            disabled={toggleTask.isPending || timer.isSaving}
+                            title={done ? "Mark as pending" : "Mark as complete"}
+                            className="mt-0.5 shrink-0 text-violet-300 transition-transform hover:scale-110 disabled:opacity-50"
                           >
-                            {task.title}
-                          </p>
-                          {task.description && (
-                            <p className="mt-0.5 line-clamp-2 text-xs text-white/40">
-                              {task.description}
-                            </p>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/50">
-                              {task.subject}
-                            </span>
-                            <span
+                            {done ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-white/25" />
+                            )}
+                          </button>
+
+                          <div className="min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:basis-auto">
+                            <p
                               className={cn(
-                                "rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize",
-                                PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.medium
+                                "truncate text-sm font-medium text-white",
+                                done && "text-white/40 line-through"
                               )}
                             >
-                              {task.priority}
-                            </span>
-                            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/50">
-                              <Clock className="h-2.5 w-2.5" /> {task.estMinutes}m
-                            </span>
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-white/40">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/50">
+                                {task.subject}
+                              </span>
+                              <span
+                                className={cn(
+                                  "rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize",
+                                  PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.medium
+                                )}
+                              >
+                                {task.priority}
+                              </span>
+                              <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/50">
+                                <Clock className="h-2.5 w-2.5" /> {task.estMinutes}m
+                              </span>
+                              {studiedMs >= 1000 && (
+                                <span className="flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-200">
+                                  <TimerIcon className="h-2.5 w-2.5" /> Studied{" "}
+                                  {fmtStudied(studiedMs)}
+                                </span>
+                              )}
+                              {isRunning && (
+                                <span className="flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-200">
+                                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                                  {fmtClock(elapsedMs)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ml-auto flex shrink-0 items-center gap-1">
+                            {!done &&
+                              (isRunning ? (
+                                <button
+                                  onClick={timer.pauseTimer}
+                                  title="Pause timer"
+                                  className="flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-500/20"
+                                >
+                                  <Pause className="h-3 w-3" /> Pause
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    timer.startTimer(task, toDateKey(date))
+                                  }
+                                  disabled={timer.isSaving}
+                                  title={isActive ? "Resume timer" : "Start study timer"}
+                                  className="flex items-center gap-1 rounded-lg border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[11px] font-medium text-violet-200 transition-colors hover:bg-violet-500/20 disabled:opacity-50"
+                                >
+                                  <Play className="h-3 w-3" />
+                                  {isActive ? "Resume" : "Start timer"}
+                                </button>
+                              ))}
+
+                            <button
+                              onClick={() => handleDelete(task)}
+                              className="rounded-lg p-1.5 text-white/25 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
+                              title="Remove task"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-
-                        <button
-                          onClick={() => handleDelete(task)}
-                          className="shrink-0 rounded-lg p-1.5 text-white/25 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
-                          title="Remove task"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </motion.li>
                     );
                   })}
@@ -432,9 +680,136 @@ export function Planner() {
           </GlassCard>
         </div>
 
-        {/* ===== Sidebar ===== */}
-        <div className="space-y-6">
-          {/* Quick notes */}
+        {/* ============ RIGHT: timer, notes, summary ============ */}
+        <div className="min-w-0 space-y-6">
+          <AnimatePresence initial={false}>
+            {timerActive && (
+              <motion.div
+                key="study-timer"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="lg:sticky lg:top-4 lg:z-10"
+              >
+                <GlassPanel className="border-violet-400/30 p-5 sm:p-6">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <TimerIcon className="h-4 w-4 text-violet-300" /> Study timer
+                    </h3>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        timer.isRunning
+                          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                          : "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                      )}
+                    >
+                      {timer.isRunning && (
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                      )}
+                      {timer.isRunning ? "Running" : "Paused"}
+                    </span>
+                  </div>
+
+                  <p className="truncate text-sm text-white/70" title={timerState.title}>
+                    {timerState.title}
+                  </p>
+
+                  <div className="my-4 text-center font-mono text-4xl font-semibold tracking-tight text-white">
+                    {fmtClock(elapsedMs)}
+                  </div>
+
+                  {estMs > 0 && (
+                    <div className="mb-4">
+                      <div className="mb-1.5 flex items-center justify-between text-[11px] text-white/40">
+                        <span>Planned {timerState.estMinutes}m</span>
+                        {overMs > 0 ? (
+                          <span className="text-amber-300">+{fmtClock(overMs)} over</span>
+                        ) : (
+                          <span>{Math.round(timerPct)}%</span>
+                        )}
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-[width] duration-500",
+                            overMs > 0
+                              ? "bg-amber-400"
+                              : "bg-gradient-to-r from-violet-400 to-electric-400"
+                          )}
+                          style={{ width: `${timerPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!timerOnThisDate && (
+                    <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/50">
+                      Ye task {fmtDateLabel(fromDateKey(timerState.dateKey))} ka hai.
+                      <button
+                        onClick={() => setDate(fromDateKey(timerState.dateKey))}
+                        className="mt-2 flex items-center gap-1 font-medium text-violet-300 hover:text-violet-200"
+                      >
+                        Go to that date <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {timer.isRunning ? (
+                      <Button
+                        onClick={timer.pauseTimer}
+                        variant="outline"
+                        className="rounded-xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      >
+                        <Pause className="mr-1.5 h-4 w-4" /> Pause
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={timer.resumeTimer}
+                        className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"
+                      >
+                        <Play className="mr-1.5 h-4 w-4" /> Resume
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => timer.stopTimer(false)}
+                      disabled={timer.isSaving}
+                      variant="outline"
+                      className="rounded-xl border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      {timer.isSaving ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="mr-1.5 h-4 w-4" />
+                      )}
+                      Stop &amp; save
+                    </Button>
+                  </div>
+
+                  <Button
+                    onClick={() => timer.stopTimer(true)}
+                    disabled={timer.isSaving}
+                    className="mt-2 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {timer.isSaving ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="mr-1.5 h-4 w-4" />
+                    )}
+                    Finish &amp; mark complete
+                  </Button>
+
+                  <p className="mt-3 text-[11px] leading-relaxed text-white/30">
+                    "Stop &amp; save" se study time save hota hai aur task pending rehta hai. Timer
+                    page refresh karne par bhi chalta rahega.
+                  </p>
+                </GlassPanel>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <GlassCard className="p-5 sm:p-6">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
               <StickyNote className="h-4 w-4 text-amber-300" /> Quick notes
@@ -450,7 +825,6 @@ export function Planner() {
             />
           </GlassCard>
 
-          {/* Summary */}
           <GlassPanel className="p-5 sm:p-6">
             <h3 className="mb-1 text-base font-semibold text-white">Planner summary</h3>
             <p className="mb-4 text-xs text-white/40">
@@ -463,6 +837,11 @@ export function Planner() {
               <SummaryRow label="Pending" value={summary.pending} accent="amber" />
               <SummaryRow label="Total minutes" value={summary.totalMinutes} />
               <SummaryRow label="Minutes completed" value={summary.doneMinutes} accent="emerald" />
+              <SummaryRow
+                label="Studied (timer)"
+                value={fmtStudied(studiedTodayMs)}
+                accent="emerald"
+              />
             </div>
 
             {summary.total > 0 && (
@@ -494,7 +873,7 @@ function SummaryRow({
   accent,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   accent?: "emerald" | "amber";
 }) {
   return (

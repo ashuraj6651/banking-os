@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Sparkles,
   Copy,
+  History,
 } from "lucide-react";
 import { ViewHeader } from "../ViewHeader";
 import { GlassCard, GlassPanel } from "../GlassCard";
@@ -69,7 +70,6 @@ function computeStreak(): number {
   const dates = history.map((r) => r.date).sort().reverse();
   const today = getToday();
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  // Streak must include today or yesterday to be active
   if (dates[0] !== today && dates[0] !== yesterday) return 0;
   let streak = 1;
   for (let i = 1; i < dates.length; i++) {
@@ -179,7 +179,6 @@ export function DailyChallenge() {
   const bestScore = getBestScore();
   const avgScore = getAverageScore();
 
-  // Timer logic
   useEffect(() => {
     if (phase !== "live" || selected !== null) {
       if (timerRef.current) {
@@ -193,7 +192,6 @@ export function DailyChallenge() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
-          // Auto-submit as wrong on timeout
           return 0;
         }
         return prev - 1;
@@ -254,7 +252,6 @@ export function DailyChallenge() {
     [selected, phase, isSubmitting, questions, questionIdx, submit]
   );
 
-  // Handle timeout — auto-submit as wrong
   useEffect(() => {
     if (phase === "live" && timeLeft === 0 && selected === null) {
       handleSelect(null);
@@ -263,7 +260,6 @@ export function DailyChallenge() {
 
   function nextQuestion() {
     if (questionIdx + 1 >= questions.length) {
-      // Finish
       const record: DailyRecord = {
         date: getToday(),
         score: computeScore(),
@@ -327,7 +323,6 @@ export function DailyChallenge() {
     }
   }
 
-  // Intro screen
   if (phase === "intro") {
     const alreadyDone = todayRecord !== null;
 
@@ -341,144 +336,127 @@ export function DailyChallenge() {
         />
 
         <div className="grid gap-6 md:grid-cols-3">
-          {/* Main info card */}
-          <GlassCard className="md:col-span-2 p-6 sm:p-8">
-            <div className="flex flex-col gap-6">
-              {/* Today's challenge hero */}
-              <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-electric-500/20 border border-violet-500/20">
-                  <Target className="h-10 w-10 text-violet-400" />
-                </div>
-                <div className="text-center sm:text-left">
-                  <h2 className="text-xl font-bold text-white">
-                    {alreadyDone ? "Today's Challenge Complete!" : "Ready for Today's Challenge?"}
-                  </h2>
-                  <p className="mt-1 text-sm text-white/50">
-                    {alreadyDone
-                      ? `You scored ${todayRecord.score} pts. You can retake to improve!`
-                      : `${QUESTION_COUNT} random questions across all subjects. Each question has a 30s timer.`}
-                  </p>
-                </div>
-              </div>
+          <GlassCard className="md:col-span-2 p-0 overflow-hidden border-white/10">
+            <div className="relative p-6 sm:p-8">
+              {/* Background Glow Effect */}
+              <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-violet-500/10 blur-[80px] pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-electric-500/10 blur-[80px] pointer-events-none" />
 
-              {/* Scoring rules */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 p-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/20">
-                    <Check className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-emerald-300">+{POINTS_CORRECT} pts</div>
-                    <div className="text-xs text-white/40">Correct answer</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-2xl bg-rose-500/10 border border-rose-500/15 p-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-500/20">
-                    <X className="h-5 w-5 text-rose-400" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-rose-300">{POINTS_WRONG} pts</div>
-                    <div className="text-xs text-white/40">Wrong / timeout</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 border border-amber-500/15 p-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/20">
-                    <Zap className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-amber-300">+{SPEED_BONUS} bonus</div>
-                    <div className="text-xs text-white/40">Under {SPEED_BONUS_THRESHOLD}s</div>
+              <div className="relative z-10 flex flex-col gap-8">
+                <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center text-center sm:text-left">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="grid h-24 w-24 shrink-0 place-items-center rounded-3xl bg-gradient-to-br from-violet-500/20 to-electric-500/20 border border-violet-500/30 shadow-[0_0_30px_-10px_rgba(139,92,246,0.5)]"
+                  >
+                    <Target className="h-12 w-12 text-violet-400" />
+                  </motion.div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                      {alreadyDone ? "Daily Quest Complete!" : "Ready for Today's Quest?"}
+                    </h2>
+                    <p className="text-sm sm:text-base text-white/50 max-w-lg leading-relaxed">
+                      {alreadyDone
+                        ? `You've already conquered today's challenge with ${todayRecord.score} pts. Want to beat your score?`
+                        : `Test your knowledge with ${QUESTION_COUNT} random questions. Speed earns you bonus points!`}
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Start / Retake button */}
-              <div className="flex justify-center pt-2">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={startChallenge}
-                  disabled={isLoading || questions.length < QUESTION_COUNT}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-2xl px-8 py-3.5 text-sm font-semibold transition-all",
-                    "bg-gradient-to-r from-violet-600 to-electric-600 text-white shadow-[0_4px_24px_-4px_rgba(139,92,246,0.5)]",
-                    "hover:shadow-[0_8px_32px_-4px_rgba(139,92,246,0.6)]",
-                    "disabled:opacity-50 disabled:cursor-not-allowed"
-                  )}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : alreadyDone ? (
-                    <RotateCcw className="h-5 w-5" />
-                  ) : (
-                    <ArrowRight className="h-5 w-5" />
-                  )}
-                  {isLoading
-                    ? "Loading questions…"
-                    : alreadyDone
-                      ? "Retake Challenge"
-                      : "Start Challenge"}
-                </motion.button>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {[
+                    { icon: Check, color: "emerald", label: `+${POINTS_CORRECT} pts`, sub: "Correct answer", bg: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-300" },
+                    { icon: X, color: "rose", label: `${POINTS_WRONG} pts`, sub: "Wrong / timeout", bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-300" },
+                    { icon: Zap, color: "amber", label: `+${SPEED_BONUS} bonus`, sub: `Under ${SPEED_BONUS_THRESHOLD}s`, bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-300" },
+                  ].map((rule, i) => (
+                    <motion.div
+                      key={i}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      className={cn("flex items-center gap-3 rounded-2xl border p-4 transition-all duration-300", rule.bg, rule.border)}
+                    >
+                      <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-opacity-20", rule.bg.replace('/10', '/20'))}>
+                        <rule.icon className={cn("h-5 w-5", rule.text)} />
+                      </div>
+                      <div>
+                        <div className={cn("text-sm font-bold", rule.text)}>{rule.label}</div>
+                        <div className="text-[11px] text-white/40">{rule.sub}</div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="flex justify-center pt-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(139,92,246,0.4)" }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={startChallenge}
+                    disabled={isLoading || questions.length < QUESTION_COUNT}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-2xl px-10 py-4 text-sm font-bold transition-all overflow-hidden",
+                      "bg-gradient-to-r from-violet-600 via-violet-500 to-electric-600 text-white",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {/* Pulsing background effect */}
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:animate-pulse" />
+                    
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : alreadyDone ? (
+                      <RotateCcw className="h-5 w-5" />
+                    ) : (
+                      <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    )}
+                    <span className="relative z-10">
+                      {isLoading ? "Loading..." : alreadyDone ? "Retake Challenge" : "Start Challenge"}
+                    </span>
+                  </motion.button>
+                </div>
               </div>
             </div>
           </GlassCard>
 
-          {/* Stats sidebar */}
-          <GlassCard className="p-6" delay={0.1}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/40">
-              Your Stats
-            </h3>
-            <div className="flex flex-col gap-5">
-              {/* Streak */}
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-500/15 border border-amber-500/20">
-                  <Flame className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-white">
-                    <Counter value={streak} duration={0.8} />
+          <GlassCard className="p-6 flex flex-col border-white/10">
+            <div className="flex items-center gap-2 mb-6">
+              <Trophy className="h-4 w-4 text-white/40" />
+              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-white/40">
+                Player Stats
+              </h3>
+            </div>
+            
+            <div className="flex flex-col gap-6">
+              {[
+                { icon: Flame, color: "amber", label: "Day streak", value: streak, bg: "bg-amber-500/15", border: "border-amber-500/20", text: "text-amber-400" },
+                { icon: Trophy, color: "violet", label: "Best score", value: bestScore, suffix: " pts", bg: "bg-violet-500/15", border: "border-violet-500/20", text: "text-violet-400" },
+                { icon: Sparkles, color: "electric", label: "Average score", value: avgScore, suffix: " pts", bg: "bg-electric-500/15", border: "border-electric-500/20", text: "text-electric-400" },
+              ].map((stat, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-2xl border", stat.bg, stat.border)}>
+                    <stat.icon className={cn("h-6 w-6", stat.text)} />
                   </div>
-                  <div className="text-xs text-white/40">Day streak</div>
-                </div>
-              </div>
-
-              {/* Best score */}
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-500/15 border border-violet-500/20">
-                  <Trophy className="h-5 w-5 text-violet-400" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-white">
-                    <Counter value={bestScore} duration={0.8} suffix=" pts" />
+                  <div className="flex flex-col">
+                    <div className="text-2xl font-bold text-white tracking-tight">
+                      <Counter value={stat.value} duration={0.8} suffix={stat.suffix} />
+                    </div>
+                    <div className="text-[11px] text-white/40 uppercase tracking-wider">{stat.label}</div>
                   </div>
-                  <div className="text-xs text-white/40">Best score</div>
                 </div>
-              </div>
-
-              {/* Average score */}
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-electric-500/15 border border-electric-500/20">
-                  <Sparkles className="h-5 w-5 text-electric-400" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-white">
-                    <Counter value={avgScore} duration={0.8} suffix=" pts" />
-                  </div>
-                  <div className="text-xs text-white/40">Average score</div>
-                </div>
-              </div>
+              ))}
 
               {getHistory().length > 0 && (
-                <div className="mt-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                  <div className="text-xs text-white/30 mb-1.5">Recent</div>
-                  <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto scrollbar-premium">
+                <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                  <div className="flex items-center gap-2 mb-3 text-white/30">
+                    <History className="h-3 w-3" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">Recent Activity</span>
+                  </div>
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto scrollbar-premium">
                     {getHistory()
                       .sort((a, b) => b.date.localeCompare(a.date))
                       .slice(0, 5)
                       .map((r) => (
-                        <div key={r.date} className="flex items-center justify-between text-xs">
-                          <span className="text-white/50">{r.date.slice(5)}</span>
-                          <span className={cn("font-semibold", r.correct === r.total ? "text-emerald-400" : "text-white/70")}>
+                        <div key={r.date} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-transparent hover:border-white/10 transition-colors group">
+                          <span className="text-xs text-white/40 group-hover:text-white/60 transition-colors">{r.date.slice(5)}</span>
+                          <span className={cn("text-xs font-bold", r.correct === r.total ? "text-emerald-400" : "text-white/70")}>
                             {r.score} pts · {r.correct}/{r.total}
                           </span>
                         </div>
@@ -512,7 +490,6 @@ export function DailyChallenge() {
           subtitle={`Question ${questionIdx + 1} of ${questions.length}`}
         />
 
-        {/* Progress bar */}
         <div className="flex gap-1.5">
           {questions.map((_, i) => {
             let dotColor = "bg-white/10";
@@ -530,7 +507,6 @@ export function DailyChallenge() {
           })}
         </div>
 
-        {/* Timer bar */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Clock className={cn("h-4 w-4", timerColor)} />
@@ -555,7 +531,6 @@ export function DailyChallenge() {
           </div>
         </div>
 
-        {/* Question card */}
         <AnimatePresence mode="wait">
           <motion.div
             key={questionIdx}
@@ -578,7 +553,6 @@ export function DailyChallenge() {
                 {q.text}
               </h3>
 
-              {/* Options */}
               <div className="grid gap-3">
                 {q.options.map((opt, i) => {
                   const isChosen = selected === i;
@@ -654,7 +628,6 @@ export function DailyChallenge() {
                 })}
               </div>
 
-              {/* Explanation & Next */}
               <AnimatePresence>
                 {isAnswered && (
                   <motion.div
@@ -698,7 +671,6 @@ export function DailyChallenge() {
                 )}
               </AnimatePresence>
 
-              {/* Submitting overlay */}
               {isSubmitting && (
                 <div className="absolute inset-0 grid place-items-center rounded-3xl bg-[#070b16]/60 backdrop-blur-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
@@ -711,7 +683,6 @@ export function DailyChallenge() {
     );
   }
 
-  // Result screen
   if (phase === "result") {
     const score = computeScore();
     const correctCount = answered.filter((a) => a.correct).length;
@@ -732,10 +703,8 @@ export function DailyChallenge() {
         />
 
         <div className="grid gap-6 md:grid-cols-3">
-          {/* Main result card */}
           <GlassCard className="md:col-span-2 p-6 sm:p-8">
             <div className="flex flex-col items-center gap-6">
-              {/* Score ring */}
               <div className="relative">
                 <Ring
                   value={Math.round((score / Math.max(1, maxPossible)) * 100)}
@@ -748,7 +717,6 @@ export function DailyChallenge() {
                 />
               </div>
 
-              {/* Score breakdown */}
               <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
                 <GlassPanel className="p-4 text-center">
                   <div className="text-2xl font-bold text-emerald-400">
@@ -776,7 +744,6 @@ export function DailyChallenge() {
                 </GlassPanel>
               </div>
 
-              {/* Per-question breakdown */}
               <div className="w-full space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-white/30 mb-3">
                   Question Breakdown
@@ -822,7 +789,6 @@ export function DailyChallenge() {
                 ))}
               </div>
 
-              {/* Action buttons */}
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <motion.button
                   whileHover={{ scale: 1.03 }}
@@ -846,7 +812,6 @@ export function DailyChallenge() {
             </div>
           </GlassCard>
 
-          {/* Streak & stats sidebar */}
           <div className="space-y-6">
             <GlassCard className="p-6" delay={0.1}>
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/40">

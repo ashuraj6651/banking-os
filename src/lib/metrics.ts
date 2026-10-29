@@ -205,7 +205,51 @@ export function generateTodayMissions(profile: {
 /**
  * Ensure today's missions exist for a profile (idempotent).
  */
+const missionLocks = new Map<string, Promise<unknown>>();
+
+/**
+ * Removes duplicate missions (same title on the same day), keeping the one that
+ * is already done (or otherwise the first). Fixes rows created by concurrent
+ * requests racing each other.
+ */
+async function dedupeMissions<T extends { id: string; title: string; done: boolean }>(
+  rows: T[],
+): Promise<T[]> {
+  const keep = new Map<string, T>();
+  const remove: string[] = [];
+  for (const row of rows) {
+    const prev = keep.get(row.title);
+    if (!prev) {
+      keep.set(row.title, row);
+    } else if (!prev.done && row.done) {
+      remove.push(prev.id);
+      keep.set(row.title, row);
+    } else {
+      remove.push(row.id);
+    }
+  }
+  if (remove.length > 0) {
+    await db.mission.deleteMany({ where: { id: { in: remove } } });
+  }
+  return rows.filter((r) => keep.get(r.title) === r);
+}
+
 export async function ensureTodayMissions(profileId: string, preloadedProfile?: {
+  studyHoursPerDay: number;
+  weakSubjects: string;
+}) {
+  // Serialize per profile so simultaneous requests can't both insert today's set.
+  const previous = missionLocks.get(profileId) ?? Promise.resolve();
+  const run = previous.catch(() => {}).then(() => ensureTodayMissionsInner(profileId, preloadedProfile));
+  missionLocks.set(profileId, run);
+  try {
+    return await run;
+  } finally {
+    if (missionLocks.get(profileId) === run) missionLocks.delete(profileId);
+  }
+}
+
+async function ensureTodayMissionsInner(profileId: string, preloadedProfile?: {
   studyHoursPerDay: number;
   weakSubjects: string;
 }) {
@@ -220,10 +264,12 @@ export async function ensureTodayMissions(profileId: string, preloadedProfile?: 
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(endOfDay.getDate() + 1);
 
-  const existing = await db.mission.findMany({
-    where: { profileId, date: { gte: startOfDay, lt: endOfDay } },
-    orderBy: { order: "asc" },
-  });
+  const existing = await dedupeMissions(
+    await db.mission.findMany({
+      where: { profileId, date: { gte: startOfDay, lt: endOfDay } },
+      orderBy: { order: "asc" },
+    }),
+  );
   if (existing.length > 0) {
     const hasCurrentAffairs = existing.some((m) => m.title === "Current Affairs");
     if (!hasCurrentAffairs) {
@@ -291,6 +337,7 @@ export async function ensureTodayMissions(profileId: string, preloadedProfile?: 
       order: i,
       profileId,
     })),
+    skipDuplicates: true,
   });
   return db.mission.findMany({
     where: { profileId, date: { gte: startOfDay, lt: endOfDay } },

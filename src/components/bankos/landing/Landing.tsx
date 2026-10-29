@@ -96,7 +96,7 @@ export function Landing() {
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-white/55">
-                BankOS isn&apos;t a coaching app. It&apos;s a study operating system — mission control,
+                BankOS isn&apos;t a coaching app. It&apos;s a study operating system — a smart dashboard,
                 an adaptive AI planner, immersive focus mode, and a readiness engine that predicts
                 your selection. Built for SBI PO, IBPS, RBI Grade B and every banking exam.
               </p>
@@ -104,7 +104,7 @@ export function Landing() {
             <Reveal delay={0.15}>
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
                 <MagneticButton onClick={startAuth} className="btn-press ripple-container px-7 py-3.5 text-base" onMouseDown={handleRipple}>
-                  Enter Mission Control <ArrowRight className="h-4 w-4" />
+                  Open Dashboard <ArrowRight className="h-4 w-4" />
                 </MagneticButton>
                 <MagneticGhost onClick={startAuth} className="btn-press px-6 py-3 text-base">
                   <Sparkles className="h-4 w-4 text-violet-300" /> Watch the AI Coach
@@ -406,17 +406,17 @@ function HeroPreview() {
           <span className="h-3 w-3 rounded-full bg-rose-400/70" />
           <span className="h-3 w-3 rounded-full bg-amber-400/70" />
           <span className="h-3 w-3 rounded-full bg-emerald-400/70" />
-          <span className="ml-3 text-xs text-white/30">bankos.app / mission-control</span>
+          <span className="ml-3 text-xs text-white/30">bankos.app / dashboard</span>
         </div>
 
         <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-3">
           {/* greeting + mission */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 text-xs text-white/40">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> Mission Control
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> Dashboard
             </div>
             <h3 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
-              Good Evening, <span className="text-gradient-static">Ashu</span>
+              Good Evening, <span className="text-gradient-static">Aspirant</span>
             </h3>
             <div className="mt-1 flex items-center gap-2 text-sm text-white/50">
               <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-0.5 text-[11px] font-medium text-violet-200">SBI PO 2027</span>
@@ -488,7 +488,7 @@ function CoachPreview() {
         </span>
       </div>
       <div className="rounded-2xl rounded-tl-sm border border-white/[0.06] bg-white/[0.03] p-3.5 text-sm leading-relaxed text-white/85">
-        Good evening, Ashu. Reasoning is up <span className="text-emerald-300">+4%</span> this week. Quant dipped — I&apos;ve queued two DI drills for tomorrow. Want a focused 3-day Quant recovery plan?
+        Good evening! Reasoning is up <span className="text-emerald-300">+4%</span> this week. Quant dipped — I&apos;ve queued two DI drills for tomorrow. Want a focused 3-day Quant recovery plan?
       </div>
       <div className="flex justify-end">
         <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-gradient-to-b from-violet-500 to-electric-600 px-3.5 py-2.5 text-sm text-white">
