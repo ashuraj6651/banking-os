@@ -346,6 +346,64 @@ export function useQuestions(subject?: string, difficulty?: string, refreshKey =
   });
 }
 
+// ---------- Daily Challenge / Question Bank ----------
+export type DailyChallengeSet = {
+  questions: Question[];
+  /** true when the unseen pool ran out and older questions were reused */
+  recycled: boolean;
+  freshRemaining: number;
+};
+
+/** Fetches a brand-new set of questions every time it is called (never cached). */
+export function useDailyChallengeSet() {
+  return useMutation({
+    mutationFn: (body: { count?: number; exclude?: string[] }) =>
+      jfetch<DailyChallengeSet>("/api/daily-challenge", {
+        method: "POST",
+        body: JSON.stringify(body),
+        timeoutMs: 45000,
+      }),
+  });
+}
+
+export type QuestionBankStats = {
+  total: number;
+  fresh: number;
+  bySubject: { subject: string; total: number; fresh: number }[];
+};
+
+export function useQuestionBankStats() {
+  return useQuery({
+    queryKey: ["question-bank"],
+    queryFn: () => jfetch<QuestionBankStats>("/api/question-bank", { timeoutMs: 45000 }),
+    staleTime: 30 * 1000,
+  });
+}
+
+export type ImportResult = {
+  total: number;
+  added: number;
+  duplicates: number;
+  invalid: number;
+  errors: { row: number; message: string }[];
+};
+
+export function useImportQuestions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { content: string; format?: "json" | "csv" }) =>
+      jfetch<ImportResult>("/api/question-bank/import", {
+        method: "POST",
+        body: JSON.stringify(body),
+        timeoutMs: 60000,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["question-bank"] });
+      qc.invalidateQueries({ queryKey: ["questions"] });
+    },
+  });
+}
+
 export function useSubmitAttempt() {
   const qc = useQueryClient();
   return useMutation({
