@@ -32,6 +32,57 @@ function getSubjectsForBalance(weakSubjects: string): string[] {
   return priority.length === all.length ? priority : [...all];
 }
 
+function chooseBalancedQuestions<T extends { subject: string }>(
+  questions: T[],
+  totalSlots: number,
+  subjects: string[]
+): T[] {
+  if (questions.length <= totalSlots) return questions;
+
+  const bySubject = new Map<string, T[]>();
+  for (const q of questions) {
+    const existing = bySubject.get(q.subject) ?? [];
+    existing.push(q);
+    bySubject.set(q.subject, existing);
+  }
+
+  const selected: T[] = [];
+  const subjectOrder = [...subjects.filter((s) => bySubject.has(s))];
+  const fallback = questions.filter((q) => !subjectOrder.includes(q.subject));
+
+  const baseQuota = Math.floor(totalSlots / Math.max(1, subjectOrder.length));
+  const remainder = totalSlots % Math.max(1, subjectOrder.length);
+  const quotas = new Map<string, number>();
+
+  for (let i = 0; i < subjectOrder.length; i++) {
+    const subject = subjectOrder[i];
+    const available = bySubject.get(subject)?.length ?? 0;
+    quotas.set(subject, Math.min(available, baseQuota + (i < remainder ? 1 : 0)));
+  }
+
+  let remainingSlots = totalSlots;
+  for (const subject of subjectOrder) {
+    const qList = bySubject.get(subject) ?? [];
+    const take = Math.min(qList.length, quotas.get(subject) ?? 0);
+    selected.push(...qList.slice(0, take));
+    remainingSlots -= take;
+  }
+
+  if (remainingSlots > 0) {
+    const usedIds = new Set(selected.map((q) => (q as any).id));
+    const extras = [...questions].filter((q) => !usedIds.has((q as any).id));
+    selected.push(...extras.slice(0, remainingSlots));
+  }
+
+  // If the set still skews more than expected, flatten back to a deterministic
+  // mixed order by subject, not by newest-created order.
+  if (selected.length > totalSlots) {
+    return selected.slice(0, totalSlots);
+  }
+
+  return selected;
+}
+
 async function generateQuestionsWithAI(
   subject: string,
   difficulty: string,
@@ -217,17 +268,21 @@ export async function GET(req: NextRequest) {
 
   const dbQuestions = await db.question.findMany({
     where: {
-      ...(subject && subject !== "All" ? { subject } : {}),
+      ...(subject && subject !== "All" ? { subject } : { subject: { in: subjectsToGen } }),
       ...(difficulty && difficulty !== "All" ? { difficulty } : {}),
       ...(topic ? { topic } : {}),
       id: { notIn: Array.from(attemptedSet) },
     },
-    take: totalSlots,
+    take: Math.max(totalSlots * 4, totalSlots),
     orderBy: { createdAt: "desc" },
   });
 
-  if (dbQuestions.length >= totalSlots) {
-    const result = dbQuestions.slice(0, totalSlots).map(q => ({
+  const balancedDbQuestions = subject && subject !== "All"
+    ? dbQuestions.slice(0, totalSlots)
+    : chooseBalancedQuestions(dbQuestions, totalSlots, subjectsToGen);
+
+  if (balancedDbQuestions.length >= totalSlots) {
+    const result = balancedDbQuestions.slice(0, totalSlots).map(q => ({
       ...q,
       options: JSON.parse(q.options),
     }));
@@ -237,11 +292,11 @@ export async function GET(req: NextRequest) {
   }
 
   // Add existing DB questions first
-  allNewQuestions.push(...dbQuestions.map(q => ({
+  allNewQuestions.push(...balancedDbQuestions.map(q => ({
     ...q,
     options: JSON.parse(q.options),
   })));
-  generated = dbQuestions.length;
+  generated = balancedDbQuestions.length;
 
   // Generate remaining with AI
   const remaining = Math.max(0, totalSlots - generated);
