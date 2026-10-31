@@ -599,3 +599,9 @@ BankingOS is a fully functional banking exam preparation web application. After 
    - Add sound effects for correct/wrong answers in Practice
    - Improve FocusMode with better question transitions
    - Add notes export from FocusMode to Notebook
+---
+Task: Daily Challenge — 25 questions, no repeats, monthly question import
+- Daily Challenge now serves 25 questions (30s timer each + overall clock) from `POST /api/daily-challenge`, which returns a fresh mixed set on every call: skips everything the user already attempted and everything the browser reports as recently served (localStorage `dailyChallengeSeenIds`). Only when the unseen pool is exhausted are older questions recycled (oldest first).
+- Built-in bank (~670 questions) in `src/lib/question-bank/` — generated Quant/Reasoning (answers computed) + handwritten English/Banking/Reasoning. `ensureQuestionBank()` inserts missing ones (matched by text) on first use; idempotent, never deletes.
+- Monthly import: "Add questions" in the Daily Challenge page → `POST /api/question-bank/import` (JSON or CSV, templates downloadable). Duplicates and invalid rows are skipped and reported.
+- Fixed: timeout could submit the same question twice; "today" now uses local date instead of UTC.

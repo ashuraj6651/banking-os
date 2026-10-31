@@ -23,7 +23,8 @@ import { ViewHeader } from "../ViewHeader";
 import { GlassCard, GlassPanel } from "../GlassCard";
 import { Counter } from "../Counter";
 import { Ring } from "../Ring";
-import { useQuestions, useSubmitAttempt, type Question } from "@/lib/hooks";
+import { useDailyChallengeSet, useSubmitAttempt, type Question } from "@/lib/hooks";
+import { QuestionBankPanel } from "../QuestionBankPanel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -39,8 +40,38 @@ type DailyRecord = {
   timeSec: number;
 };
 
+// Local calendar date (YYYY-MM-DD) — not UTC, so "today" flips at the user's midnight.
+function localDate(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDate(new Date());
+}
+
+/* Questions already served to this browser, sent to the server so a refresh
+   never brings the same questions back (the server also skips everything attempted). */
+const SEEN_KEY = "dailyChallengeSeenIds";
+const SEEN_LIMIT = 600;
+
+function getSeenIds(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(SEEN_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberSeenIds(ids: string[], reset: boolean) {
+  try {
+    const base = reset ? [] : getSeenIds().filter((id) => !ids.includes(id));
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...base, ...ids].slice(-SEEN_LIMIT)));
+  } catch {
+    // storage unavailable — the server-side attempt history still prevents most repeats
+  }
 }
 
 function getHistory(): DailyRecord[] {
@@ -69,7 +100,7 @@ function computeStreak(): number {
   if (history.length === 0) return 0;
   const dates = history.map((r) => r.date).sort().reverse();
   const today = getToday();
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterday = localDate(new Date(Date.now() - 86400000));
   if (dates[0] !== today && dates[0] !== yesterday) return 0;
   let streak = 1;
   for (let i = 1; i < dates.length; i++) {
@@ -150,7 +181,7 @@ const SPEED_BONUS_THRESHOLD = 10;
 const POINTS_CORRECT = 20;
 const POINTS_WRONG = -5;
 const SPEED_BONUS = 10;
-const QUESTION_COUNT = 5;
+const QUESTION_COUNT = 25;
 
 const OPTION_LABELS = ["A", "B", "C", "D"];
 
@@ -166,13 +197,15 @@ export function DailyChallenge() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [totalTimeSec, setTotalTimeSec] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [sessionSec, setSessionSec] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const questionStartRef = useRef<number>(Date.now());
+  const lockRef = useRef(false); // one submission per question (timeout + click can race)
 
-  const { data, isLoading } = useQuestions();
+  const challengeSet = useDailyChallengeSet();
+  const isLoading = challengeSet.isPending;
   const submit = useSubmitAttempt();
-
-  const questions: Question[] = (data?.questions ?? []).slice(0, QUESTION_COUNT);
 
   const todayRecord = getTodayRecord();
   const streak = computeStreak();
@@ -205,17 +238,26 @@ export function DailyChallenge() {
     };
   }, [phase, questionIdx, selected]);
 
+  // Overall clock for the whole 25-question run
+  useEffect(() => {
+    if (phase !== "live") return;
+    const started = Date.now();
+    const id = setInterval(() => setSessionSec(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
   const handleSelect = useCallback(
     async (idx: number | null) => {
-      if (selected !== null || phase !== "live" || isSubmitting) return;
-      setIsSubmitting(true);
+      if (phase !== "live" || lockRef.current) return;
       const q = questions[questionIdx];
       if (!q) return;
+      lockRef.current = true;
+      setIsSubmitting(true);
 
       const elapsedSec = (Date.now() - questionStartRef.current) / 1000;
       const bonus = elapsedSec < SPEED_BONUS_THRESHOLD;
 
-      setSelected(idx);
+      setSelected(idx ?? -1); // -1 = timed out
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -240,16 +282,24 @@ export function DailyChallenge() {
         ]);
         setTotalTimeSec((t) => t + Math.round(elapsedSec));
       } catch {
+        // Network/server problem: grade locally so the run can continue.
+        const correct = idx !== null && idx === q.answer;
         setAnswered((prev) => [
           ...prev,
-          { sel: idx ?? -1, correct: false, explanation: "Could not submit.", timeSec: Math.round(elapsedSec), bonus: false },
+          {
+            sel: idx ?? -1,
+            correct,
+            explanation: q.explanation || "Could not save this attempt, but your answer was checked.",
+            timeSec: Math.round(elapsedSec),
+            bonus: correct && bonus,
+          },
         ]);
         setTotalTimeSec((t) => t + Math.round(elapsedSec));
       } finally {
         setIsSubmitting(false);
       }
     },
-    [selected, phase, isSubmitting, questions, questionIdx, submit]
+    [phase, questions, questionIdx, submit]
   );
 
   useEffect(() => {
@@ -274,6 +324,7 @@ export function DailyChallenge() {
       }
       setPhase("result");
     } else {
+      lockRef.current = false;
       setQuestionIdx((i) => i + 1);
       setSelected(null);
       setTimeLeft(TIMER_SECONDS);
@@ -288,17 +339,38 @@ export function DailyChallenge() {
     }, 0);
   }
 
-  function startChallenge() {
+  async function startChallenge() {
+    if (challengeSet.isPending) return;
+    try {
+      // Always ask the server for a brand-new set — never reuse a cached one.
+      const set = await challengeSet.mutateAsync({ count: QUESTION_COUNT, exclude: getSeenIds() });
+      if (set.questions.length === 0) {
+        toast.error("No questions available right now. Add some to the question bank first.");
+        return;
+      }
+      rememberSeenIds(set.questions.map((q) => q.id), set.recycled);
+      if (set.recycled) {
+        toast.info("You've seen most of the question bank — some older questions are repeating. Add this month's list in Question Bank for fresh ones.");
+      }
+      setQuestions(set.questions);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load questions. Please try again.");
+      return;
+    }
+    lockRef.current = false;
+    setSessionSec(0);
     setPhase("live");
     setQuestionIdx(0);
     setSelected(null);
     setTimeLeft(TIMER_SECONDS);
     setAnswered([]);
     setTotalTimeSec(0);
+    setShowConfetti(false);
     questionStartRef.current = Date.now();
   }
 
   function resetChallenge() {
+    lockRef.current = false;
     setPhase("intro");
     setQuestionIdx(0);
     setSelected(null);
@@ -332,7 +404,7 @@ export function DailyChallenge() {
           badge="Daily"
           badgeIcon={<Target className="h-3 w-3" />}
           title="Daily Challenge"
-          subtitle="5 questions, 30 seconds each. Build your streak and earn speed bonuses."
+          subtitle={`${QUESTION_COUNT} fresh questions, ${TIMER_SECONDS} seconds each. Build your streak and earn speed bonuses.`}
         />
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -358,7 +430,7 @@ export function DailyChallenge() {
                     <p className="text-sm sm:text-base text-white/50 max-w-lg leading-relaxed">
                       {alreadyDone
                         ? `You've already conquered today's challenge with ${todayRecord.score} pts. Want to beat your score?`
-                        : `Test your knowledge with ${QUESTION_COUNT} random questions. Speed earns you bonus points!`}
+                        : `Test yourself with ${QUESTION_COUNT} brand-new questions — every run is different. Speed earns you bonus points!`}
                     </p>
                   </div>
                 </div>
@@ -390,7 +462,7 @@ export function DailyChallenge() {
                     whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(139,92,246,0.4)" }}
                     whileTap={{ scale: 0.95 }}
                     onClick={startChallenge}
-                    disabled={isLoading || questions.length < QUESTION_COUNT}
+                    disabled={isLoading}
                     className={cn(
                       "group relative flex items-center gap-3 rounded-2xl px-10 py-4 text-sm font-bold transition-all overflow-hidden",
                       "bg-gradient-to-r from-violet-600 via-violet-500 to-electric-600 text-white",
@@ -408,7 +480,7 @@ export function DailyChallenge() {
                       <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     )}
                     <span className="relative z-10">
-                      {isLoading ? "Loading..." : alreadyDone ? "Retake Challenge" : "Start Challenge"}
+                      {isLoading ? "Preparing questions..." : alreadyDone ? "Retake Challenge" : "Start Challenge"}
                     </span>
                   </motion.button>
                 </div>
@@ -467,6 +539,8 @@ export function DailyChallenge() {
             </div>
           </GlassCard>
         </div>
+
+        <QuestionBankPanel perChallenge={QUESTION_COUNT} />
       </div>
     );
   }
@@ -528,6 +602,10 @@ export function DailyChallenge() {
               animate={{ width: `${timerPercent}%` }}
               transition={{ duration: 1, ease: "linear" }}
             />
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-white/40" title="Total time so far">
+            <span className="hidden sm:inline">Total</span>
+            {Math.floor(sessionSec / 60)}:{String(sessionSec % 60).padStart(2, "0")}
           </div>
         </div>
 
@@ -644,7 +722,7 @@ export function DailyChallenge() {
                           </span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-sm font-semibold text-rose-400">
-                            <X className="h-4 w-4" /> {selected === null ? "Time's up!" : "Incorrect"}
+                            <X className="h-4 w-4" /> {selected === -1 ? "Time's up!" : "Incorrect"}
                           </span>
                         )}
                         <span className="text-xs text-white/30 ml-auto">
