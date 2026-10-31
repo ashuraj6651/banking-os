@@ -6,6 +6,8 @@ import { getProfile } from "@/lib/metrics";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const DEFAULT_QUESTION_LIMIT = 25;
+
 // In-memory cache for generated questions (per user-day-subject-difficulty)
 const questionCache = new Map<string, { questions: any[]; createdAt: number; }>();
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
@@ -16,18 +18,18 @@ function getCacheKey(profileId: string, subject: string, difficulty: string): st
 }
 
 function getSubjectsForBalance(weakSubjects: string): string[] {
-  const all = ["Reasoning", "English", "Quant", "Current Affairs", "Banking"];
-  const weak = weakSubjects.split(",").map(s => s.trim()).filter(Boolean);
-  if (weak.length === 0) return all;
-  // Weight weak subjects more heavily
-  const balanced: string[] = [];
-  for (const w of weak) {
-    balanced.push(w, w, w); // 3x weight for weak subjects
-  }
-  for (const s of all) {
-    if (!weak.includes(s)) balanced.push(s);
-  }
-  return balanced;
+  const all = ["Reasoning", "English", "Quant", "Banking", "Current Affairs"];
+  const weak = weakSubjects
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => all.includes(s));
+
+  // Keep all major subjects in the pool so "All" is truly mixed across the
+  // complete banking exam syllabus instead of skewing toward a single section.
+  if (weak.length === 0) return [...all];
+
+  const priority = [...new Set([...weak, ...all.filter((s) => !weak.includes(s))])];
+  return priority.length === all.length ? priority : [...all];
 }
 
 async function generateQuestionsWithAI(
@@ -45,7 +47,7 @@ async function generateQuestionsWithAI(
   const subjectTopics: Record<string, string> = {
     "Reasoning": "syllogisms, puzzles, coding-decoding, blood relations, direction sense, seating arrangement, inequality, series, analogy, classification",
     "English": "grammar, fill in the blank, error spotting, synonyms, antonyms, idioms, reading comprehension, one-word substitution, sentence rearrangement",
-    "Quant": "number series, percentage, ratio & proportion, time & work, profit & loss, simple interest, compound interest, average, data interpretation, simplification, algebra, mensuration, probability",
+    "Quant": "number series, percentage, ratio & proportion, time & work, profit & loss, simple interest, compound interest, average, data interpretation, simplification, algebra, mensuration, proportion, speed-time-distance",
     "Current Affairs": "RBI policies, government schemes, economic indicators, banking reforms, financial inclusion, digital banking, monetary policy committees",
     "Banking": "banking products, negotiable instruments, accounts, insurance, RBI history, monetary policy, banking regulation, payment systems",
   };
@@ -61,41 +63,8 @@ async function generateQuestionsWithAI(
     : "";
 
   const prompt = topicOverride
-    ? `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}", specifically on the topic "${topicOverride}" — every question must be about this exact topic, nothing else.
-
-Requirements:
-- Each question must have exactly 4 options (A, B, C, D)
-- Questions should be realistic banking exam questions (like SBI PO, IBPS PO, RBI Grade B)
-- ${difficulty} difficulty level
-- Provide clear, concise explanations (1-2 sentences)
-- Every question must stay strictly on the topic "${topicOverride}"
-- Make questions different from each other
-- Answer should be the 0-based index (0=A, 1=B, 2=C, 3=D)
-- Set the "topic" field in your response to exactly "${topicOverride}"
-${existingTextsList}
-
-Return ONLY valid JSON array with no markdown, no code fences, no explanation outside JSON. Format:
-[{"text":"question text","options":["option A","option B","option C","option D"],"answer":0,"explanation":"explanation","topic":"${topicOverride}"}]
-
-Generate the questions now:`
-    : `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}".
-
-Topics to cover: ${topics}
-
-Requirements:
-- Each question must have exactly 4 options (A, B, C, D)
-- Questions should be realistic banking exam questions (like SBI PO, IBPS PO, RBI Grade B)
-- ${difficulty} difficulty level
-- Provide clear, concise explanations (1-2 sentences)
-- Vary the topics within ${subject}
-- Make questions different from each other
-- Answer should be the 0-based index (0=A, 1=B, 2=C, 3=D)
-${existingTextsList}
-
-Return ONLY valid JSON array with no markdown, no code fences, no explanation outside JSON. Format:
-[{"text":"question text","options":["option A","option B","option C","option D"],"answer":0,"explanation":"explanation","topic":"specific topic"}]
-
-Generate the questions now:`;
+    ? `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}", specifically on the topic "${topicOverride}".\n\nRequirements:\n- Each question must have exactly 4 options (A, B, C, D)\n- Questions should be realistic banking exam questions (like SBI PO, IBPS PO, RBI Grade B)\n- ${difficulty} difficulty level\n- Provide clear, concise explanations (1-2 sentences)\n- Every question must stay strictly on the topic "${topicOverride}"\n- Make questions different from each other\n- Answer should be the 0-based index (0=A, 1=B, 2=C, 3=D)\n- Set the "topic" field in your response to exactly "${topicOverride}"\n${existingTextsList}\n\nReturn ONLY valid JSON array with no markdown, no code fences, no explanation outside JSON. Format:\n[{"text":"question text","options":["option A","option B","option C","option D"],"answer":0,"explanation":"explanation","topic":"${topicOverride}"}]\n\nGenerate the questions now:`
+    : `You are a banking exam question generator for BankOS. Generate ${count} unique, fresh ${difficulty}-difficulty multiple-choice questions for the subject "${subject}".\n\nTopics to cover: ${topics}\n\nRequirements:\n- Each question must have exactly 4 options (A, B, C, D)\n- Questions should be realistic banking exam questions (like SBI PO, IBPS PO, RBI Grade B)\n- ${difficulty} difficulty level\n- Provide clear, concise explanations (1-2 sentences)\n- Vary the topics within ${subject}\n- Make questions different from each other\n- Answer should be the 0-based index (0=A, 1=B, 2=C, 3=D)\n${existingTextsList}\n\nReturn ONLY valid JSON array with no markdown, no code fences, no explanation outside JSON. Format:\n[{"text":"question text","options":["option A","option B","option C","option D"],"answer":0,"explanation":"explanation","topic":"specific topic"}]\n\nGenerate the questions now:`;
 
   const text = (await generateText(prompt)).trim();
 
@@ -135,7 +104,7 @@ export async function GET(req: NextRequest) {
   const subject = searchParams.get("subject");
   const difficulty = searchParams.get("difficulty");
   const topic = searchParams.get("topic");
-  const limit = Number(searchParams.get("limit") || "10");
+  const limit = Number(searchParams.get("limit") || String(DEFAULT_QUESTION_LIMIT));
   const refresh = searchParams.get("refresh") === "true";
 
   const profile = await getProfile();
@@ -149,7 +118,7 @@ export async function GET(req: NextRequest) {
 
     const questions = await db.question.findMany({
       where,
-      take: limit,
+      take: Math.max(1, Math.min(50, limit)),
       orderBy: { createdAt: "asc" },
     });
 
@@ -231,7 +200,7 @@ export async function GET(req: NextRequest) {
     : ["Easy", "Medium", "Hard"];
 
   // Calculate per-subject distribution
-  const totalSlots = limit;
+  const totalSlots = Math.max(1, Math.min(50, limit));
   const subjectSlots = Math.ceil(totalSlots / subjectsToGen.length);
   const diffSlots = Math.ceil(subjectSlots / difficultiesToGen.length);
 
@@ -253,12 +222,12 @@ export async function GET(req: NextRequest) {
       ...(topic ? { topic } : {}),
       id: { notIn: Array.from(attemptedSet) },
     },
-    take: limit,
+    take: totalSlots,
     orderBy: { createdAt: "desc" },
   });
 
-  if (dbQuestions.length >= limit) {
-    const result = dbQuestions.slice(0, limit).map(q => ({
+  if (dbQuestions.length >= totalSlots) {
+    const result = dbQuestions.slice(0, totalSlots).map(q => ({
       ...q,
       options: JSON.parse(q.options),
     }));
@@ -290,14 +259,6 @@ export async function GET(req: NextRequest) {
     const startSubjectIdx = seedHash % subjectsToTry.length;
     subjectsToTry = [...subjectsToTry.slice(startSubjectIdx), ...subjectsToTry.slice(0, startSubjectIdx)];
 
-    // Work out the batches to run up front, then fire the AI calls for all
-    // of them concurrently. This used to run one subject at a time —
-    // sequentially awaiting each AI call — so with several subjects queued
-    // up (5-9 for a "balanced" mix) a slow AI response could stack up to a
-    // minute-plus of total wait, well past the point where the "Loading
-    // questions…" screen felt stuck. Running them in parallel means the
-    // total wait is roughly the slowest single call, not the sum of all of
-    // them, and the per-call timeout in lib/groq.ts caps that too.
     const batchesToRun: { subj: string; diff: string; batchSize: number }[] = [];
     let remainingToPlan = remaining;
     let planCursor = generated;
@@ -361,7 +322,7 @@ export async function GET(req: NextRequest) {
       const hashB = (dayNum * 31 + b.text.length) % 1000;
       return hashA - hashB;
     })
-    .slice(0, limit);
+    .slice(0, totalSlots);
 
   // Cache the result
   questionCache.set(cacheKey, { questions: result, createdAt: Date.now() });
